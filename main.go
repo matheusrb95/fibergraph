@@ -14,53 +14,8 @@ func ID() int {
 	return id
 }
 
-func network1() *Node {
-	Box1 := NewNode(ID(), "Box1", BoxNodeType)
-	Box2 := NewNode(ID(), "Box2", BoxNodeType)
-	Box3 := NewNode(ID(), "Box3", BoxNodeType)
-
-	ONU1 := NewNode(ID(), "ONU1", ONUNodeType)
-	ONU1.Active = false
-
-	ONU2 := NewNode(ID(), "ONU2", ONUNodeType)
-	ONU2.Active = false
-
-	ONU3 := NewNode(ID(), "ONU3", ONUNodeType)
-	ONU3.Active = false
-
-	ONU4 := NewNode(ID(), "ONU4", ONUNodeType)
-	//ONU4.Active = false
-
-	OLT := NewNode(ID(), "OLT", OLTNodeType)
-
-	Splitter1 := NewNode(ID(), "Splitter1", SplitterNodeType)
-	Splitter2 := NewNode(ID(), "Splitter2", SplitterNodeType)
-	Splitter3 := NewNode(ID(), "Splitter3", SplitterNodeType)
-
-	Box1.SetParent(OLT)
-	Box1.SetChildren(Splitter1)
-	Splitter1.SetChildren(ONU1, ONU2)
-
-	Box2.SetParent(OLT)
-	Box2.SetChildren(Splitter2)
-	Splitter2.SetChildren(ONU3)
-
-	Box3.SetParent(OLT)
-	Box3.SetChildren(Splitter3)
-	Splitter3.SetChildren(ONU4)
-
-	ONU1.SetParent(Splitter1)
-	ONU2.SetParent(Splitter1)
-	ONU3.SetParent(Splitter2)
-	ONU4.SetParent(Splitter3)
-
-	OLT.SetChildren(Box1, Box2, Box3)
-
-	return OLT
-}
-
 func main() {
-	node := network1()
+	node := network2()
 	inactivateNodes(node)
 	findRootCauses(node)
 	drawGraphs(node)
@@ -137,7 +92,7 @@ func drawGraphs(node *Node) {
 			if !child.Active {
 				attr = graph.VertexAttribute("color", "red")
 			} else {
-				attr = graph.VertexAttribute("color", "black")
+				attr = graph.VertexAttribute("color", "green")
 			}
 
 			if child.RootCause {
