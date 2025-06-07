@@ -128,3 +128,96 @@ func network2() *Node {
 
 	return OLT
 }
+
+func network3() *Node {
+	OLT := NewNode(ID(), "OLT", OLTNodeType)
+
+	OLT1 := NewNode(ID(), "OLT1", OLTNodeType)
+	OLT2 := NewNode(ID(), "OLT2", OLTNodeType)
+
+	Cable1 := NewNode(ID(), "Cable1", CableNodeType)
+	Cable2 := NewNode(ID(), "Cable2", CableNodeType)
+
+	Splitter1 := NewNode(ID(), "Splitter1x2", SplitterNodeType)
+	Splitter2 := NewNode(ID(), "Splitter1x2", SplitterNodeType)
+
+	Cable3 := NewNode(ID(), "Cable3", CableNodeType)
+	Cable4 := NewNode(ID(), "Cable4", CableNodeType)
+	Cable5 := NewNode(ID(), "Cable5", CableNodeType)
+	Cable6 := NewNode(ID(), "Cable6", CableNodeType)
+
+	Splitter3 := NewNode(ID(), "Splitter1x4", SplitterNodeType)
+	Fusion1 := NewNode(ID(), "Fusion1", SplitterNodeType)
+	Fusion2 := NewNode(ID(), "Fusion2", SplitterNodeType)
+	Splitter4 := NewNode(ID(), "Splitter1x4", SplitterNodeType)
+
+	Cable7 := NewNode(ID(), "Cable7", CableNodeType)
+	Cable8 := NewNode(ID(), "Cable8", CableNodeType)
+	Cable9 := NewNode(ID(), "Cable9", CableNodeType)
+	Cable10 := NewNode(ID(), "Cable10", CableNodeType)
+	Drop1 := NewNode(ID(), "Drop1", CableNodeType)
+
+	Splitter5 := NewNode(ID(), "Splitter1x8", SplitterNodeType)
+	Splitter6 := NewNode(ID(), "Splitter1x2", SplitterNodeType)
+	Fiber1 := NewNode(ID(), "Fiber1", SplitterNodeType)
+	Splitter7 := NewNode(ID(), "Splitter1x4", SplitterNodeType)
+	Splitter8 := NewNode(ID(), "Splitter1x8", SplitterNodeType)
+	Splitter9 := NewNode(ID(), "Splitter1x8", SplitterNodeType)
+
+	Drop2 := NewNode(ID(), "Drop2", CableNodeType)
+	Drop3 := NewNode(ID(), "Drop3", CableNodeType)
+	Drop4 := NewNode(ID(), "Drop4", CableNodeType)
+	Drop5 := NewNode(ID(), "Drop5", CableNodeType)
+
+	ONU1 := NewNode(ID(), "ONU1", ONUNodeType)
+	ONU1.Active = true
+	ONU2 := NewNode(ID(), "ONU2", ONUNodeType)
+	ONU2.Active = false
+	ONU3 := NewNode(ID(), "ONU3", ONUNodeType)
+	ONU3.Active = false
+	ONU4 := NewNode(ID(), "ONU4", ONUNodeType)
+	ONU4.Active = false
+	ONU5 := NewNode(ID(), "ONU5", ONUNodeType)
+	ONU5.Active = false
+
+	ONU1.SetParent(Drop2)
+	Drop2.SetParent(Splitter5)
+	Splitter5.SetParent(Cable7)
+	Cable7.SetParent(Splitter3)
+	Splitter3.SetParent(Cable3)
+	Cable3.SetParent(Splitter1)
+	Splitter1.SetParent(Cable1)
+	Cable1.SetParent(OLT1)
+	OLT1.SetParent(OLT)
+
+	ONU2.SetParent(Drop3)
+	Drop3.SetParent(Splitter7)
+	Splitter7.SetParent(Fiber1)
+	Fiber1.SetParent(Splitter6)
+	Splitter6.SetParent(Cable8)
+	Cable8.SetParent(Fusion1)
+	Fusion1.SetParent(Cable4)
+	Cable4.SetParent(Splitter1)
+
+	ONU3.SetParent(Drop4)
+	Drop4.SetParent(Splitter8)
+	Splitter8.SetParent(Cable9)
+	Cable9.SetParent(Fusion2)
+	Fusion2.SetParent(Cable5)
+	Cable5.SetParent(Splitter2)
+	Splitter2.SetParent(Cable2)
+	Cable2.SetParent(OLT2)
+	OLT2.SetParent(OLT)
+
+	ONU4.SetParent(Drop5)
+	Drop5.SetParent(Splitter9)
+	Splitter9.SetParent(Cable10)
+	Cable10.SetParent(Splitter4)
+	Splitter4.SetParent(Cable6)
+	Cable6.SetParent(Splitter2)
+
+	ONU5.SetParent(Drop1)
+	Drop1.SetParent(Splitter4)
+
+	return OLT
+}

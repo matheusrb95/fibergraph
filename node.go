@@ -43,9 +43,14 @@ func NewNode(id int, name string, nodeType NodeType) *Node {
 
 func (n *Node) SetParent(node *Node) {
 	n.parent = node
+	node.addChildren(n)
 }
 
 func (n *Node) SetChildren(nodes ...*Node) {
+	n.children = append(n.children, nodes...)
+}
+
+func (n *Node) addChildren(nodes ...*Node) {
 	n.children = append(n.children, nodes...)
 }
 

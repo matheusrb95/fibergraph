@@ -15,7 +15,7 @@ func ID() int {
 }
 
 func main() {
-	node := network2()
+	node := network3()
 	inactivateNodes(node)
 	findRootCauses(node)
 	drawGraphs(node)
