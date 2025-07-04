@@ -1,6 +1,6 @@
-package main
+package data
 
-func network1() *Node {
+func Network1() *Node {
 	Box1 := NewNode(ID(), "Box1", BoxNodeType)
 	Box2 := NewNode(ID(), "Box2", BoxNodeType)
 	Box3 := NewNode(ID(), "Box3", BoxNodeType)
@@ -45,7 +45,7 @@ func network1() *Node {
 	return OLT
 }
 
-func network2() *Node {
+func Network2() *Node {
 	OLT := NewNode(ID(), "OLT", OLTNodeType)
 
 	Cable1 := NewNode(ID(), "Cable1", CableNodeType)
@@ -129,7 +129,7 @@ func network2() *Node {
 	return OLT
 }
 
-func network3() *Node {
+func Network3() *Node {
 	OLT := NewNode(ID(), "OLT", OLTNodeType)
 
 	OLT1 := NewNode(ID(), "OLT1", OLTNodeType)

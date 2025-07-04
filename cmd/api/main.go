@@ -5,32 +5,27 @@ import (
 
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
+
+	"github.com/matheusrb95/fibergraph/internal/data"
 )
 
-var id int
-
-func ID() int {
-	id++
-	return id
-}
-
 func main() {
-	node := network3()
+	node := data.Network3()
 	inactivateNodes(node)
 	findRootCauses(node)
 	drawGraphs(node)
 }
 
-func findRoot(node *Node) *Node {
-	for node.parent != nil {
-		node = node.parent
+func findRoot(node *data.Node) *data.Node {
+	for node.Parent != nil {
+		node = node.Parent
 	}
 
 	return node
 }
 
-func inactivateNodes(node *Node) {
-	for _, child := range node.children {
+func inactivateNodes(node *data.Node) {
+	for _, child := range node.Children {
 		inactivateNodes(child)
 
 		if Inactive(child) {
@@ -39,13 +34,13 @@ func inactivateNodes(node *Node) {
 	}
 }
 
-func Inactive(node *Node) bool {
-	if node.children == nil {
+func Inactive(node *data.Node) bool {
+	if node.Children == nil {
 		return false
 	}
 
 	var inactives int
-	for _, child := range node.children {
+	for _, child := range node.Children {
 		if child.Active {
 			continue
 		}
@@ -53,16 +48,16 @@ func Inactive(node *Node) bool {
 		inactives++
 	}
 
-	return inactives == len(node.children)
+	return inactives == len(node.Children)
 }
 
-func findRootCauses(node *Node) {
+func findRootCauses(node *data.Node) {
 	if Inactive(node) {
 		node.RootCause = true
 		return
 	}
 
-	for _, child := range node.children {
+	for _, child := range node.Children {
 		if Inactive(node) {
 			node.RootCause = true
 			continue
@@ -72,13 +67,13 @@ func findRootCauses(node *Node) {
 	}
 }
 
-func drawGraphs(node *Node) {
+func drawGraphs(node *data.Node) {
 	g := graph.New(graph.IntHash, graph.Directed())
 
 	root := findRoot(node)
 
-	var walk func(n *Node)
-	walk = func(n *Node) {
+	var walk func(n *data.Node)
+	walk = func(n *data.Node) {
 		var attr func(*graph.VertexProperties)
 		if node.RootCause {
 			attr = graph.VertexAttribute("color", "blue")
@@ -87,7 +82,7 @@ func drawGraphs(node *Node) {
 		}
 		_ = g.AddVertex(n.ID, graph.VertexAttribute("label", n.Name), attr)
 
-		for _, child := range n.children {
+		for _, child := range n.Children {
 			var attr func(*graph.VertexProperties)
 			if !child.Active {
 				attr = graph.VertexAttribute("color", "red")

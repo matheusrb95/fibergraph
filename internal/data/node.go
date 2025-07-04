@@ -1,4 +1,4 @@
-package main
+package data
 
 type NodeType int
 
@@ -22,14 +22,21 @@ func (nt NodeType) String() string {
 	return nodeName[nt]
 }
 
+var id int
+
+func ID() int {
+	id++
+	return id
+}
+
 type Node struct {
 	ID        int
 	Name      string
 	Type      NodeType
 	Active    bool
 	RootCause bool
-	children  []*Node
-	parent    *Node
+	Children  []*Node
+	Parent    *Node
 }
 
 func NewNode(id int, name string, nodeType NodeType) *Node {
@@ -42,22 +49,22 @@ func NewNode(id int, name string, nodeType NodeType) *Node {
 }
 
 func (n *Node) SetParent(node *Node) {
-	n.parent = node
+	n.Parent = node
 	node.addChildren(n)
 }
 
 func (n *Node) SetChildren(nodes ...*Node) {
-	n.children = append(n.children, nodes...)
+	n.Children = append(n.Children, nodes...)
 }
 
 func (n *Node) addChildren(nodes ...*Node) {
-	n.children = append(n.children, nodes...)
+	n.Children = append(n.Children, nodes...)
 }
 
 func (n *Node) Depth() int {
 	var result int
-	for n.parent != nil {
-		n = n.parent
+	for n.Parent != nil {
+		n = n.Parent
 		result++
 	}
 
