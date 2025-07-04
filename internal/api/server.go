@@ -12,5 +12,7 @@ func NewServer(logger *slog.Logger, models *data.Models) http.Handler {
 
 	mux.Handle("/example", HandleExample(logger, models))
 
+	mux.Handle("POST /draw", HandleDraw(logger, models))
+
 	return mux
 }
