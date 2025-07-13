@@ -18,7 +18,7 @@ type ConnectionModel struct {
 	DB *sql.DB
 }
 
-func (m *ConnectionModel) Get(tenantID string) ([]*Connection, error) {
+func (m *ConnectionModel) GetAll(tenantID string) ([]*Connection, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 

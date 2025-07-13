@@ -15,7 +15,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tenantID := r.PathValue("tenant_id")
 
-		connections, err := models.Connection.Get(tenantID)
+		connections, err := models.Connection.GetAll(tenantID)
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
