@@ -11,8 +11,9 @@ import (
 )
 
 func Run(node *data.Node) error {
-	//inactivateNodes(node)
-	//findRootCauses(node)
+	//root := findRoot(node)
+	//inactivateNodes(root)
+	//findRootCauses(root)
 	return drawGraphs(node)
 }
 
