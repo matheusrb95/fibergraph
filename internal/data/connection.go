@@ -72,7 +72,7 @@ func getConnections(ctx context.Context, tx *sql.Tx) ([]*Connection, error) {
 	}
 	defer rows.Close()
 
-	result := make([]*Connection, 0)
+	connections := make([]*Connection, 0)
 	for rows.Next() {
 		var connection Connection
 		err := rows.Scan(
@@ -85,12 +85,12 @@ func getConnections(ctx context.Context, tx *sql.Tx) ([]*Connection, error) {
 			return nil, err
 		}
 
-		result = append(result, &connection)
+		connections = append(connections, &connection)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return connections, nil
 }
