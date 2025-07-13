@@ -11,11 +11,13 @@ var ErrRecordNotFound = errors.New("record not found")
 
 type Models struct {
 	Connection ConnectionModel
+	Segment    SegmentModel
 }
 
 func NewModels(db *sql.DB) *Models {
 	return &Models{
 		Connection: ConnectionModel{DB: db},
+		Segment:    SegmentModel{DB: db},
 	}
 }
 
