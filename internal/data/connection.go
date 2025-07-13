@@ -46,17 +46,6 @@ func (m *ConnectionModel) Get(tenantID string) ([]*Connection, error) {
 	return connections, nil
 }
 
-func setSchema(ctx context.Context, tx *sql.Tx, tenantID string) error {
-	query := fmt.Sprintf("USE `fkcp_db_ospmanager-%s`;", tenantID)
-
-	_, err := tx.ExecContext(ctx, query)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func getConnections(ctx context.Context, tx *sql.Tx) ([]*Connection, error) {
 	query := `
 		SELECT 
