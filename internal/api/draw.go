@@ -17,13 +17,13 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tenantID := r.PathValue("tenant_id")
 
-		// connections, err := models.Connection.GetAll(tenantID)
-		// if err != nil {
-		// 	serverErrorResponse(w, r, logger, err)
-		// 	return
-		// }
+		connections, err := models.Connection.GetAll(tenantID)
+		if err != nil {
+			serverErrorResponse(w, r, logger, err)
+			return
+		}
 
-		// rootNodes := buildNetworkWithConnection(connections)
+		rootNodes := buildNetworkWithConnection(connections)
 
 		segments, err := models.Segment.GetAll(tenantID)
 		if err != nil {
@@ -31,7 +31,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		// rootNodes := buildSegmentNodes(segments)
+		rootNodes = buildSegmentNodes(segments)
 
 		components, err := models.Component.GetAll(tenantID)
 		if err != nil {
@@ -39,7 +39,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		rootNodes := buildComponentNodes(components, segments)
+		rootNodes = buildComponentNodes(components, segments)
 
 		if len(rootNodes) == 0 {
 			serverErrorResponse(w, r, logger, errors.New("no nodes"))
@@ -100,7 +100,7 @@ func upsertConnectionMap(nodes map[int]*data.Node, connection *data.Connection) 
 	}
 
 	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
-	nodes[connection.ID] = data.NewNode(connection.ID, name, data.BoxNodeType)
+	nodes[connection.ID] = data.NewNode(connection.ID, name, data.BoxNode)
 }
 
 func buildSegmentNodes(segments []*data.Segment) []*data.Node {
@@ -112,7 +112,7 @@ func buildSegmentNodes(segments []*data.Segment) []*data.Node {
 		}
 
 		name := fmt.Sprintf("%d - segment", segment.ID)
-		segmentNode := data.NewNode(segment.ID, name, data.SegmentNodeType)
+		segmentNode := data.NewNode(segment.ID, name, data.SegmentNode)
 
 		fiberIDs := strings.SplitSeq(*segment.FiberIDs, ",")
 
@@ -123,7 +123,7 @@ func buildSegmentNodes(segments []*data.Segment) []*data.Node {
 			}
 
 			name := fmt.Sprintf("%d - fiber", childID)
-			fiberNode := data.NewNode(childID, name, data.FiberNodeType)
+			fiberNode := data.NewNode(childID, name, data.FiberNode)
 
 			segmentNode.SetChildren(fiberNode)
 		}
@@ -140,12 +140,12 @@ func buildComponentNodes(components []*data.Component, segments []*data.Segment)
 
 	for _, segment := range segments {
 		name := fmt.Sprintf("%d - segment", segment.ID)
-		segmentNodes[segment.ID] = data.NewNode(segment.ID, name, data.SegmentNodeType)
+		segmentNodes[segment.ID] = data.NewNode(segment.ID, name, data.SegmentNode)
 	}
 
 	for _, component := range components {
 		name := fmt.Sprintf("%d - component", component.ID)
-		componentNode := data.NewNode(component.ID, name, data.BoxNodeType)
+		componentNode := data.NewNode(component.ID, name, data.BoxNode)
 
 		childrenIDs := []string{}
 		if component.ChildrenIDs != nil {

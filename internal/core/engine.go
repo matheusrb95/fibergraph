@@ -32,7 +32,7 @@ func inactivateNodes(node *data.Node) {
 		inactivateNodes(child)
 
 		if inactive(child) {
-			child.Active = false
+			child.Status = data.Inactive
 		}
 	}
 }
@@ -44,7 +44,7 @@ func inactive(node *data.Node) bool {
 
 	var inactives int
 	for _, child := range node.Children {
-		if child.Active {
+		if child.Status == data.Active {
 			continue
 		}
 
@@ -105,10 +105,14 @@ func walk(g graph.Graph[int, int], n *data.Node) error {
 
 	for _, child := range n.Children {
 		var attr func(*graph.VertexProperties)
-		if !child.Active {
+
+		switch child.Status {
+		case data.Inactive:
 			attr = graph.VertexAttribute("color", "red")
-		} else {
+		case data.Active:
 			attr = graph.VertexAttribute("color", "green")
+		default:
+			attr = graph.VertexAttribute("color", "black")
 		}
 
 		if child.RootCause {

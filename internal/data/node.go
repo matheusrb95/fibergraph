@@ -1,43 +1,49 @@
 package data
 
-type NodeType int
+type (
+	NodeType int
+	Status   int
+)
 
 const (
-	OLTNodeType NodeType = iota
-	ONUNodeType
-	CableNodeType
-	BoxNodeType
-	FiberNodeType
-	SplitterNodeType
-	SegmentNodeType
+	BoxNode NodeType = iota
+	FiberNode
+	SplitterNode
+	SegmentNode
+)
+
+const (
+	Active Status = iota
+	Inactive
+	Unknown
 )
 
 var nodeName = map[NodeType]string{
-	OLTNodeType:      "OLT",
-	ONUNodeType:      "ONU",
-	CableNodeType:    "Cable",
-	BoxNodeType:      "Box",
-	FiberNodeType:    "Fiber",
-	SplitterNodeType: "Splitter",
-	SegmentNodeType:  "Segment",
+	BoxNode:      "Box",
+	FiberNode:    "Fiber",
+	SplitterNode: "Splitter",
+	SegmentNode:  "Segment",
+}
+
+var statusName = map[Status]string{
+	Active:   "Active",
+	Inactive: "Inactive",
+	Unknown:  "Unknown",
 }
 
 func (nt NodeType) String() string {
 	return nodeName[nt]
 }
 
-var id int
-
-func ID() int {
-	id++
-	return id
+func (s Status) String() string {
+	return statusName[s]
 }
 
 type Node struct {
 	ID        int
 	Name      string
 	Type      NodeType
-	Active    bool
+	Status    Status
 	RootCause bool
 	Children  []*Node
 	Parent    *Node
@@ -48,7 +54,7 @@ func NewNode(id int, name string, nodeType NodeType) *Node {
 		ID:     id,
 		Name:   name,
 		Type:   nodeType,
-		Active: true,
+		Status: Unknown,
 	}
 }
 
@@ -64,20 +70,10 @@ func (n *Node) SetChildren(nodes ...*Node) {
 	}
 }
 
-func (n *Node) addChildren(nodes ...*Node) {
-	n.Children = append(n.Children, nodes...)
-}
-
 func (n *Node) addParent(node *Node) {
 	n.Parent = node
 }
 
-func (n *Node) Depth() int {
-	var result int
-	for n.Parent != nil {
-		n = n.Parent
-		result++
-	}
-
-	return result
+func (n *Node) addChildren(nodes ...*Node) {
+	n.Children = append(n.Children, nodes...)
 }
