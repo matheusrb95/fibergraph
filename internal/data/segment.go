@@ -9,7 +9,7 @@ import (
 
 type Segment struct {
 	ID       int
-	FiberIDs string
+	FiberIDs *string
 }
 
 type SegmentModel struct {
@@ -33,7 +33,7 @@ func (m *SegmentModel) GetAll(tenantID string) ([]*Segment, error) {
 
 	segments, err := getSegments(ctx, tx)
 	if err != nil {
-		return nil, fmt.Errorf("get connection %w", err)
+		return nil, fmt.Errorf("get segment %w", err)
 	}
 
 	err = tx.Commit()
@@ -48,10 +48,10 @@ func getSegments(ctx context.Context, tx *sql.Tx) ([]*Segment, error) {
 	query := `
 		SELECT 
 			f.fiber_segment_id,
-			group_concat(f.fiber_id)
+			GROUP_CONCAT(f.fiber_id)
 		FROM
 			fiber f
-		WHERE
+		GROUP BY
 			f.fiber_segment_id;
 	`
 

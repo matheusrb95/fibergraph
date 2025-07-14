@@ -51,19 +51,19 @@ func getConnections(ctx context.Context, tx *sql.Tx) ([]*Connection, error) {
 		SELECT 
 			p1.port_network_component_id,
 			nc.nc_name,
-			group_concat(p2.port_network_component_id) as parent,
-			group_concat(p3.port_network_component_id) as children
+			GROUP_CONCAT(p2.port_network_component_id) AS parent,
+			GROUP_CONCAT(p3.port_network_component_id) AS children
 		FROM
 			port p1
-			LEFT OUTER JOIN network_component nc on nc.nc_id = p1.port_network_component_id
-			LEFT OUTER JOIN port p2 on p2.port_id = p1.port_connected_to_port_id and p1.optical_signal_direction = 'RX'
-			LEFT OUTER JOIN port p3 on p3.port_id = p1.port_connected_to_port_id and p1.optical_signal_direction = 'TX'
+			LEFT OUTER JOIN network_component nc ON nc.nc_id = p1.port_network_component_id
+			LEFT OUTER JOIN port p2 ON p2.port_id = p1.port_connected_to_port_id AND p1.optical_signal_direction = 'RX'
+			LEFT OUTER JOIN port p3 ON p3.port_id = p1.port_connected_to_port_id AND p1.optical_signal_direction = 'TX'
 		WHERE
 			p1.port_status = 'CONNECTED'
 		GROUP BY
 			p1.port_network_component_id
 		HAVING
-			parent IS NOT NULL or children IS NOT NULL;
+			parent IS NOT NULL OR children IS NOT NULL;
 	`
 
 	rows, err := tx.QueryContext(ctx, query)

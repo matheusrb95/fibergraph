@@ -7,7 +7,9 @@ const (
 	ONUNodeType
 	CableNodeType
 	BoxNodeType
+	FiberNodeType
 	SplitterNodeType
+	SegmentNodeType
 )
 
 var nodeName = map[NodeType]string{
@@ -15,7 +17,9 @@ var nodeName = map[NodeType]string{
 	ONUNodeType:      "ONU",
 	CableNodeType:    "Cable",
 	BoxNodeType:      "Box",
+	FiberNodeType:    "Fiber",
 	SplitterNodeType: "Splitter",
+	SegmentNodeType:  "Segment",
 }
 
 func (nt NodeType) String() string {
@@ -55,10 +59,17 @@ func (n *Node) SetParent(node *Node) {
 
 func (n *Node) SetChildren(nodes ...*Node) {
 	n.Children = append(n.Children, nodes...)
+	for _, node := range nodes {
+		node.addParent(n)
+	}
 }
 
 func (n *Node) addChildren(nodes ...*Node) {
 	n.Children = append(n.Children, nodes...)
+}
+
+func (n *Node) addParent(node *Node) {
+	n.Parent = node
 }
 
 func (n *Node) Depth() int {
