@@ -2,4 +2,6 @@ run:
 	@go run cmd/api/main.go
 
 draw:
-	@dot -Tsvg -O my-graph.gv
+	@for file in *.gv; do \
+		dot -Tsvg "$$file" -O; \
+	done

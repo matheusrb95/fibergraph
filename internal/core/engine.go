@@ -10,11 +10,13 @@ import (
 	"github.com/matheusrb95/fibergraph/internal/data"
 )
 
+var counter int
+
 func Run(node *data.Node) error {
-	//root := findRoot(node)
+	root := findRoot(node)
 	//inactivateNodes(root)
 	//findRootCauses(root)
-	return drawGraphs(node)
+	return drawGraphs(root)
 }
 
 func findRoot(node *data.Node) *data.Node {
@@ -71,8 +73,6 @@ func findRootCauses(node *data.Node) {
 func drawGraphs(node *data.Node) error {
 	g := graph.New(graph.IntHash, graph.Directed())
 
-	root := findRoot(node)
-
 	var walk func(n *data.Node) error
 	walk = func(n *data.Node) error {
 		var attr func(*graph.VertexProperties)
@@ -114,12 +114,13 @@ func drawGraphs(node *data.Node) error {
 		return nil
 	}
 
-	err := walk(root)
+	err := walk(node)
 	if err != nil {
 		return err
 	}
 
-	file, err := os.Create("my-graph.gv")
+	counter++
+	file, err := os.Create(fmt.Sprintf("%s-%d.gv", "my-graph", counter))
 	if err != nil {
 		return err
 	}
