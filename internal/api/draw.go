@@ -23,7 +23,26 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		rootNodes := buildNetworkWithConnection(connections)
+		sensors, err := models.Sensor.GetAll(tenantID)
+		if err != nil {
+			serverErrorResponse(w, r, logger, err)
+			return
+		}
+
+		rootNodes := buildNetworkWithConnection(connections, sensors)
+
+		if len(rootNodes) == 0 {
+			serverErrorResponse(w, r, logger, errors.New("no nodes"))
+			return
+		}
+
+		for _, rootNode := range rootNodes {
+			err = core.Run(rootNode)
+			if err != nil {
+				serverErrorResponse(w, r, logger, err)
+				return
+			}
+		}
 
 		segments, err := models.Segment.GetAll(tenantID)
 		if err != nil {
@@ -61,7 +80,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 	})
 }
 
-func buildNetworkWithConnection(connections []*data.Connection) []*data.Node {
+func buildNetworkWithConnection(connections []*data.Connection, sensors []*data.Sensor) []*data.Node {
 	result := make([]*data.Node, 0)
 	nodes := make(map[int]*data.Node)
 
@@ -71,6 +90,17 @@ func buildNetworkWithConnection(connections []*data.Connection) []*data.Node {
 		if connection.ParentIDs == nil {
 			result = append(result, nodes[connection.ID])
 		}
+	}
+
+	for _, sensor := range sensors {
+		fiberNode, ok := nodes[sensor.FiberID]
+		if !ok {
+			continue
+		}
+
+		name := fmt.Sprintf("%d - SPD", sensor.ID)
+		node := data.NewNode(sensor.ID+5000, name, data.SensorNode)
+		node.SetParent(fiberNode)
 	}
 
 	for _, connection := range connections {

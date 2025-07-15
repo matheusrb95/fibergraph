@@ -13,6 +13,7 @@ type Models struct {
 	Component  ComponentModel
 	Connection ConnectionModel
 	Segment    SegmentModel
+	Sensor     SensorModel
 }
 
 func NewModels(db *sql.DB) *Models {
@@ -20,6 +21,7 @@ func NewModels(db *sql.DB) *Models {
 		Component:  ComponentModel{DB: db},
 		Connection: ConnectionModel{DB: db},
 		Segment:    SegmentModel{DB: db},
+		Sensor:     SensorModel{DB: db},
 	}
 }
 

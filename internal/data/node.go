@@ -10,6 +10,7 @@ const (
 	FiberNode
 	SplitterNode
 	SegmentNode
+	SensorNode
 )
 
 const (
@@ -23,6 +24,7 @@ var nodeName = map[NodeType]string{
 	FiberNode:    "Fiber",
 	SplitterNode: "Splitter",
 	SegmentNode:  "Segment",
+	SensorNode:   "Sensor",
 }
 
 var statusName = map[Status]string{
