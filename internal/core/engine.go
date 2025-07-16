@@ -12,10 +12,12 @@ import (
 
 var counter int
 
-func Run(node *data.Node) error {
+func Run(node *data.Node, determine bool) error {
 	root := findRoot(node)
-	//inactivateNodes(root)
-	//findRootCauses(root)
+	if determine {
+		determineNodeStatus(node)
+	}
+
 	return drawGraphs(root)
 }
 
@@ -27,46 +29,33 @@ func findRoot(node *data.Node) *data.Node {
 	return node
 }
 
-func inactivateNodes(node *data.Node) {
-	for _, child := range node.Children {
-		inactivateNodes(child)
-
-		if inactive(child) {
-			child.Status = data.Inactive
-		}
-	}
-}
-
-func inactive(node *data.Node) bool {
+func determineNodeStatus(node *data.Node) {
 	if node.Children == nil {
-		return false
-	}
-
-	var inactives int
-	for _, child := range node.Children {
-		if child.Status == data.Active {
-			continue
-		}
-
-		inactives++
-	}
-
-	return inactives == len(node.Children)
-}
-
-func findRootCauses(node *data.Node) {
-	if inactive(node) {
-		node.RootCause = true
 		return
 	}
 
-	for _, child := range node.Children {
-		if inactive(node) {
-			node.RootCause = true
-			continue
-		}
+	var hasActive, hasInactive, hasUnknown bool
 
-		findRootCauses(child)
+	for _, child := range node.Children {
+		determineNodeStatus(child)
+
+		switch child.Status {
+		case data.Active:
+			hasActive = true
+		case data.Inactive:
+			hasInactive = true
+		case data.Unknown:
+			hasUnknown = true
+		}
+	}
+
+	switch {
+	case hasActive:
+		node.Status = data.Active
+	case hasInactive:
+		node.Status = data.Inactive
+	case hasUnknown:
+		node.Status = data.Unknown
 	}
 }
 

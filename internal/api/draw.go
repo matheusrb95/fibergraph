@@ -29,7 +29,9 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		rootNodes := buildNetworkWithConnection(connections, sensors)
+		nodes := make(map[int]*data.Node)
+
+		rootNodes := buildNetworkWithConnection(nodes, connections, sensors)
 
 		if len(rootNodes) == 0 {
 			serverErrorResponse(w, r, logger, errors.New("no nodes"))
@@ -37,7 +39,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 		}
 
 		for _, rootNode := range rootNodes {
-			err = core.Run(rootNode)
+			err = core.Run(rootNode, true)
 			if err != nil {
 				serverErrorResponse(w, r, logger, err)
 				return
@@ -50,7 +52,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		rootNodes = buildSegmentNodes(segments)
+		segmentNodes := buildSegmentNodes(nodes, segments)
 
 		components, err := models.Component.GetAll(tenantID)
 		if err != nil {
@@ -58,7 +60,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		rootNodes = buildComponentNodes(components, segments)
+		rootNodes = buildComponentNodes(components, segmentNodes)
 
 		if len(rootNodes) == 0 {
 			serverErrorResponse(w, r, logger, errors.New("no nodes"))
@@ -66,7 +68,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 		}
 
 		for _, rootNode := range rootNodes {
-			err = core.Run(rootNode)
+			err = core.Run(rootNode, true)
 			if err != nil {
 				serverErrorResponse(w, r, logger, err)
 				return
@@ -80,9 +82,8 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 	})
 }
 
-func buildNetworkWithConnection(connections []*data.Connection, sensors []*data.Sensor) []*data.Node {
+func buildNetworkWithConnection(nodes map[int]*data.Node, connections []*data.Connection, sensors []*data.Sensor) []*data.Node {
 	result := make([]*data.Node, 0)
-	nodes := make(map[int]*data.Node)
 
 	for _, connection := range connections {
 		upsertConnectionMap(nodes, connection)
@@ -100,6 +101,16 @@ func buildNetworkWithConnection(connections []*data.Connection, sensors []*data.
 
 		name := fmt.Sprintf("%d - SPD", sensor.ID)
 		node := data.NewNode(sensor.ID+5000, name, data.SensorNode)
+		var status data.Status
+		switch sensor.Status {
+		case "ACTIVE":
+			status = data.Active
+		case "ALARMED":
+			status = data.Inactive
+		default:
+			status = data.Unknown
+		}
+		node.Status = status
 		node.SetParent(fiberNode)
 	}
 
@@ -133,8 +144,8 @@ func upsertConnectionMap(nodes map[int]*data.Node, connection *data.Connection) 
 	nodes[connection.ID] = data.NewNode(connection.ID, name, data.BoxNode)
 }
 
-func buildSegmentNodes(segments []*data.Segment) []*data.Node {
-	result := make([]*data.Node, 0, len(segments))
+func buildSegmentNodes(nodes map[int]*data.Node, segments []*data.Segment) map[int]*data.Node {
+	result := make(map[int]*data.Node)
 
 	for _, segment := range segments {
 		if segment.FiberIDs == nil {
@@ -144,34 +155,47 @@ func buildSegmentNodes(segments []*data.Segment) []*data.Node {
 		name := fmt.Sprintf("%d - segment", segment.ID)
 		segmentNode := data.NewNode(segment.ID, name, data.SegmentNode)
 
-		fiberIDs := strings.SplitSeq(*segment.FiberIDs, ",")
+		var hasActive, hasInactive, hasUnknown bool
 
+		fiberIDs := strings.SplitSeq(*segment.FiberIDs, ",")
 		for fiberID := range fiberIDs {
-			childID, err := strconv.Atoi(fiberID)
+			fiberID, err := strconv.Atoi(fiberID)
 			if err != nil {
 				continue
 			}
 
-			name := fmt.Sprintf("%d - fiber", childID)
-			fiberNode := data.NewNode(childID, name, data.FiberNode)
+			node, ok := nodes[fiberID]
+			if !ok {
+				continue
+			}
 
-			segmentNode.SetChildren(fiberNode)
+			switch node.Status {
+			case data.Active:
+				hasActive = true
+			case data.Inactive:
+				hasInactive = true
+			case data.Unknown:
+				hasUnknown = true
+			}
 		}
 
-		result = append(result, segmentNode)
+		switch {
+		case hasActive:
+			segmentNode.Status = data.Active
+		case hasInactive:
+			segmentNode.Status = data.Inactive
+		case hasUnknown:
+			segmentNode.Status = data.Unknown
+		}
+
+		result[segment.ID] = segmentNode
 	}
 
 	return result
 }
 
-func buildComponentNodes(components []*data.Component, segments []*data.Segment) []*data.Node {
+func buildComponentNodes(components []*data.Component, segmentNodes map[int]*data.Node) []*data.Node {
 	result := make([]*data.Node, 0)
-	segmentNodes := make(map[int]*data.Node)
-
-	for _, segment := range segments {
-		name := fmt.Sprintf("%d - segment", segment.ID)
-		segmentNodes[segment.ID] = data.NewNode(segment.ID, name, data.SegmentNode)
-	}
 
 	for _, component := range components {
 		name := fmt.Sprintf("%d - component", component.ID)
@@ -195,6 +219,8 @@ func buildComponentNodes(components []*data.Component, segments []*data.Segment)
 			componentNode.SetChildren(segmentNodes[childID])
 		}
 
+		var hasActive, hasInactive, hasUnknown bool
+
 		parentIDs := []string{}
 		if component.ParentIDs != nil {
 			parentIDs = strings.Split(*component.ParentIDs, ",")
@@ -211,6 +237,26 @@ func buildComponentNodes(components []*data.Component, segments []*data.Segment)
 			}
 
 			componentNode.SetParent(segmentNodes[parentID])
+
+			if componentNode.Children == nil {
+				switch segmentNodes[parentID].Status {
+				case data.Active:
+					hasActive = true
+				case data.Inactive:
+					hasInactive = true
+				case data.Unknown:
+					hasUnknown = true
+				}
+			}
+		}
+
+		switch {
+		case hasActive:
+			componentNode.Status = data.Active
+		case hasInactive:
+			componentNode.Status = data.Inactive
+		case hasUnknown:
+			componentNode.Status = data.Unknown
 		}
 
 		if component.ParentIDs == nil {
