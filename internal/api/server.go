@@ -12,7 +12,7 @@ func NewServer(logger *slog.Logger, models *data.Models) http.Handler {
 
 	mux.Handle("/example", HandleExample(logger, models))
 
-	mux.Handle("POST /draw/{tenant_id}", HandleDraw(logger, models))
+	mux.Handle("POST /draw/{tenant_id}/{project_id}", HandleDraw(logger, models))
 
 	return mux
 }

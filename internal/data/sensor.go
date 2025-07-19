@@ -18,7 +18,7 @@ type SensorModel struct {
 	DB *sql.DB
 }
 
-func (m *SensorModel) GetAll(tenantID string) ([]*Sensor, error) {
+func (m *SensorModel) GetAll(tenantID, projectID string) ([]*Sensor, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -33,7 +33,7 @@ func (m *SensorModel) GetAll(tenantID string) ([]*Sensor, error) {
 		return nil, fmt.Errorf("set schema %w", err)
 	}
 
-	sensors, err := getSensors(ctx, tx)
+	sensors, err := getSensors(ctx, tx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("get sensor %w", err)
 	}
@@ -46,7 +46,7 @@ func (m *SensorModel) GetAll(tenantID string) ([]*Sensor, error) {
 	return sensors, nil
 }
 
-func getSensors(ctx context.Context, tx *sql.Tx) ([]*Sensor, error) {
+func getSensors(ctx context.Context, tx *sql.Tx, projectID string) ([]*Sensor, error) {
 	query := `
 		SELECT 
 			s.sensor_id,
@@ -55,10 +55,14 @@ func getSensors(ctx context.Context, tx *sql.Tx) ([]*Sensor, error) {
 			p.port_network_component_id
 		FROM
 			sensor s
-			LEFT OUTER JOIN port p ON p.port_id = s.sensor_port_id;
+			LEFT OUTER JOIN network_component nc ON nc.nc_id = s.sensor_network_component_id
+			LEFT OUTER JOIN project_network_component pnc ON pnc_network_component_id = nc.nc_id 
+			LEFT OUTER JOIN port p ON p.port_id = s.sensor_port_id
+		WHERE
+			pnc.pnc_project_id = ?;
 	`
 
-	rows, err := tx.QueryContext(ctx, query)
+	rows, err := tx.QueryContext(ctx, query, projectID)
 	if err != nil {
 		return nil, err
 	}

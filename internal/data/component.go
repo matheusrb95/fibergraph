@@ -18,7 +18,7 @@ type ComponentModel struct {
 	DB *sql.DB
 }
 
-func (m *ComponentModel) GetAll(tenantID string) ([]*Component, error) {
+func (m *ComponentModel) GetAll(tenantID, projectID string) ([]*Component, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -33,7 +33,7 @@ func (m *ComponentModel) GetAll(tenantID string) ([]*Component, error) {
 		return nil, fmt.Errorf("set schema %w", err)
 	}
 
-	components, err := getComponents(ctx, tx)
+	components, err := getComponents(ctx, tx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("get component %w", err)
 	}
@@ -46,7 +46,7 @@ func (m *ComponentModel) GetAll(tenantID string) ([]*Component, error) {
 	return components, nil
 }
 
-func getComponents(ctx context.Context, tx *sql.Tx) ([]*Component, error) {
+func getComponents(ctx context.Context, tx *sql.Tx, projectID string) ([]*Component, error) {
 	query := `
 		SELECT 
 			csc.csc_network_component_id,
@@ -56,13 +56,15 @@ func getComponents(ctx context.Context, tx *sql.Tx) ([]*Component, error) {
 		FROM
 			component_segment_connection csc
 			LEFT OUTER JOIN network_component nc ON nc.nc_id = csc.csc_network_component_id
+			LEFT OUTER JOIN project_network_component pnc ON pnc_network_component_id = nc.nc_id
 		WHERE
 			csc.csc_network_component_id IS NOT NULL
+			AND pnc.pnc_project_id = ?
 		GROUP BY
 			csc.csc_network_component_id, nc.nc_name;
 	`
 
-	rows, err := tx.QueryContext(ctx, query)
+	rows, err := tx.QueryContext(ctx, query, projectID)
 	if err != nil {
 		return nil, err
 	}
