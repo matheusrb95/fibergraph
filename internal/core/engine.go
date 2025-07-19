@@ -12,10 +12,18 @@ import (
 
 var counter int
 
-func Run(node *data.Node, determine bool) error {
+func Run(node *data.Node, determine, draw, sensor bool) error {
 	root := findRoot(node)
+	if sensor {
+		propagateSensorStatus(node)
+	}
+
 	if determine {
 		determineNodeStatus(node)
+	}
+
+	if !draw {
+		return nil
 	}
 
 	return drawGraphs(root)
@@ -27,6 +35,47 @@ func findRoot(node *data.Node) *data.Node {
 	}
 
 	return node
+}
+
+func propagateSensorStatus(node *data.Node) {
+	if node.Children == nil {
+		return
+	}
+
+	for _, child := range node.Children {
+		propagateSensorStatus(child)
+
+		if child.Type != data.SensorNode {
+			continue
+		}
+
+		switch child.Status {
+		case data.Active:
+			activeAllAbove(child)
+		case data.Inactive:
+			inactiveAllBelow(node)
+		}
+	}
+}
+
+func activeAllAbove(node *data.Node) {
+	for node.Parent != nil {
+		node.Status = data.Active
+		node = node.Parent
+	}
+}
+
+func inactiveAllBelow(node *data.Node) {
+	if node.Children == nil {
+		return
+	}
+
+	node.Status = data.Inactive
+
+	for _, child := range node.Children {
+		inactiveAllBelow(child)
+		child.Status = data.Inactive
+	}
 }
 
 func determineNodeStatus(node *data.Node) {
@@ -90,6 +139,14 @@ func walk(g graph.Graph[int, int], n *data.Node) error {
 		attr = graph.VertexAttribute("color", "black")
 	}
 
+	switch n.Status {
+	case data.Inactive:
+		attr = graph.VertexAttribute("color", "red")
+	case data.Active:
+		attr = graph.VertexAttribute("color", "green")
+	default:
+		attr = graph.VertexAttribute("color", "black")
+	}
 	_ = g.AddVertex(n.ID, graph.VertexAttribute("label", n.Name), attr)
 
 	for _, child := range n.Children {

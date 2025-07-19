@@ -5,25 +5,49 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/matheusrb95/fibergraph/internal/core"
 	"github.com/matheusrb95/fibergraph/internal/data"
+	"github.com/matheusrb95/fibergraph/internal/request"
 	"github.com/matheusrb95/fibergraph/internal/response"
 )
+
+type SensorStatus struct {
+	Active  []string `json:"active_sensors"`
+	Alarmed []string `json:"alarmed_sensors"`
+}
 
 func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tenantID := r.PathValue("tenant_id")
+		if tenantID == "" {
+			notFoundResponse(w, r, logger)
+			return
+		}
 
-		connections, err := models.Connection.GetAll(tenantID)
+		projectID := r.PathValue("project_id")
+		if projectID == "" {
+			notFoundResponse(w, r, logger)
+			return
+		}
+
+		var sensorStatus SensorStatus
+		err := request.DecodeJSON(w, r, &sensorStatus)
+		if err != nil {
+			badRequestResponse(w, r, logger, err)
+			return
+		}
+
+		connections, err := models.Connection.GetAll(tenantID, projectID)
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
 		}
 
-		sensors, err := models.Sensor.GetAll(tenantID)
+		sensors, err := models.Sensor.GetAll(tenantID, projectID)
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
@@ -31,22 +55,22 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 
 		nodes := make(map[int]*data.Node)
 
-		rootNodes := buildNetworkWithConnection(nodes, connections, sensors)
+		rootNodes := buildNetworkWithConnection(nodes, connections, sensors, sensorStatus.Active, sensorStatus.Alarmed)
 
 		if len(rootNodes) == 0 {
-			serverErrorResponse(w, r, logger, errors.New("no nodes"))
+			badRequestResponse(w, r, logger, errors.New("no nodes"))
 			return
 		}
 
 		for _, rootNode := range rootNodes {
-			err = core.Run(rootNode, true)
+			err = core.Run(rootNode, false, true, true)
 			if err != nil {
 				serverErrorResponse(w, r, logger, err)
 				return
 			}
 		}
 
-		segments, err := models.Segment.GetAll(tenantID)
+		segments, err := models.Segment.GetAll(tenantID, projectID)
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
@@ -54,21 +78,28 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 
 		segmentNodes := buildSegmentNodes(nodes, segments)
 
-		components, err := models.Component.GetAll(tenantID)
+		components, err := models.Component.GetAll(tenantID, projectID)
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
 		}
 
+		logger.Info("network size",
+			"connections_len", len(connections),
+			"sensors_len", len(sensors),
+			"segments_len", len(segments),
+			"components_len", len(components),
+		)
+
 		rootNodes = buildComponentNodes(components, segmentNodes)
 
 		if len(rootNodes) == 0 {
-			serverErrorResponse(w, r, logger, errors.New("no nodes"))
+			badRequestResponse(w, r, logger, errors.New("no nodes"))
 			return
 		}
 
 		for _, rootNode := range rootNodes {
-			err = core.Run(rootNode, true)
+			err = core.Run(rootNode, true, true, false)
 			if err != nil {
 				serverErrorResponse(w, r, logger, err)
 				return
@@ -82,7 +113,13 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 	})
 }
 
-func buildNetworkWithConnection(nodes map[int]*data.Node, connections []*data.Connection, sensors []*data.Sensor) []*data.Node {
+func buildNetworkWithConnection(
+	nodes map[int]*data.Node,
+	connections []*data.Connection,
+	sensors []*data.Sensor,
+	activeSensors []string,
+	alarmedSensors []string,
+) []*data.Node {
 	result := make([]*data.Node, 0)
 
 	for _, connection := range connections {
@@ -100,16 +137,24 @@ func buildNetworkWithConnection(nodes map[int]*data.Node, connections []*data.Co
 		}
 
 		name := fmt.Sprintf("%d - SPD", sensor.ID)
-		node := data.NewNode(sensor.ID+5000, name, data.SensorNode)
+		node := data.NewNode(sensor.ID+1_000_000, name, data.SensorNode)
 		var status data.Status
-		switch sensor.Status {
-		case "ACTIVE":
-			status = data.Active
-		case "ALARMED":
+
+		if slices.Contains(alarmedSensors, sensor.DevEUI) {
 			status = data.Inactive
-		default:
+		} else if slices.Contains(activeSensors, sensor.DevEUI) {
+			status = data.Active
+		} else {
 			status = data.Unknown
 		}
+		// switch sensor.Status {
+		// case "ACTIVE":
+		// status = data.Active
+		// case "ALARMED":
+		// status = data.Inactive
+		// default:
+		// status = data.Unknown
+		// }
 		node.Status = status
 		node.SetParent(fiberNode)
 	}
@@ -198,7 +243,7 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 	result := make([]*data.Node, 0)
 
 	for _, component := range components {
-		name := fmt.Sprintf("%d - component", component.ID)
+		name := fmt.Sprintf("%d - %s", component.ID, component.Name)
 		componentNode := data.NewNode(component.ID, name, data.BoxNode)
 
 		childrenIDs := []string{}
@@ -248,6 +293,8 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 					hasUnknown = true
 				}
 			}
+
+			break
 		}
 
 		switch {
