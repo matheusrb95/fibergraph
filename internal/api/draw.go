@@ -141,7 +141,7 @@ func buildNetworkWithConnection(
 		var status data.Status
 
 		if slices.Contains(alarmedSensors, sensor.DevEUI) {
-			status = data.Inactive
+			status = data.Alarmed
 		} else if slices.Contains(activeSensors, sensor.DevEUI) {
 			status = data.Active
 		} else {
@@ -151,7 +151,7 @@ func buildNetworkWithConnection(
 		// case "ACTIVE":
 		// status = data.Active
 		// case "ALARMED":
-		// status = data.Inactive
+		// status = data.Alarmed
 		// default:
 		// status = data.Unknown
 		// }
@@ -217,7 +217,7 @@ func buildSegmentNodes(nodes map[int]*data.Node, segments []*data.Segment) map[i
 			switch node.Status {
 			case data.Active:
 				hasActive = true
-			case data.Inactive:
+			case data.Alarmed:
 				hasInactive = true
 			case data.Unknown:
 				hasUnknown = true
@@ -228,7 +228,7 @@ func buildSegmentNodes(nodes map[int]*data.Node, segments []*data.Segment) map[i
 		case hasActive:
 			segmentNode.Status = data.Active
 		case hasInactive:
-			segmentNode.Status = data.Inactive
+			segmentNode.Status = data.Alarmed
 		case hasUnknown:
 			segmentNode.Status = data.Unknown
 		}
@@ -287,7 +287,7 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 				switch segmentNodes[parentID].Status {
 				case data.Active:
 					hasActive = true
-				case data.Inactive:
+				case data.Alarmed:
 					hasInactive = true
 				case data.Unknown:
 					hasUnknown = true
@@ -301,7 +301,7 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 		case hasActive:
 			componentNode.Status = data.Active
 		case hasInactive:
-			componentNode.Status = data.Inactive
+			componentNode.Status = data.Alarmed
 		case hasUnknown:
 			componentNode.Status = data.Unknown
 		}

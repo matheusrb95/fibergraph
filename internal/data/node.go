@@ -15,7 +15,7 @@ const (
 
 const (
 	Active Status = iota
-	Inactive
+	Alarmed
 	Unknown
 )
 
@@ -28,9 +28,9 @@ var nodeName = map[NodeType]string{
 }
 
 var statusName = map[Status]string{
-	Active:   "Active",
-	Inactive: "Inactive",
-	Unknown:  "Unknown",
+	Active:  "Active",
+	Alarmed: "Alarmed",
+	Unknown: "Unknown",
 }
 
 func (nt NodeType) String() string {
@@ -42,13 +42,12 @@ func (s Status) String() string {
 }
 
 type Node struct {
-	ID        int
-	Name      string
-	Type      NodeType
-	Status    Status
-	RootCause bool
-	Children  []*Node
-	Parent    *Node
+	ID       int
+	Name     string
+	Type     NodeType
+	Status   Status
+	Children []*Node
+	Parent   *Node
 }
 
 func NewNode(id int, name string, nodeType NodeType) *Node {

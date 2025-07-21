@@ -52,7 +52,7 @@ func propagateSensorStatus(node *data.Node) {
 		switch child.Status {
 		case data.Active:
 			activeAllAbove(child)
-		case data.Inactive:
+		case data.Alarmed:
 			inactiveAllBelow(node)
 		}
 	}
@@ -70,11 +70,11 @@ func inactiveAllBelow(node *data.Node) {
 		return
 	}
 
-	node.Status = data.Inactive
+	node.Status = data.Alarmed
 
 	for _, child := range node.Children {
 		inactiveAllBelow(child)
-		child.Status = data.Inactive
+		child.Status = data.Alarmed
 	}
 }
 
@@ -91,7 +91,7 @@ func determineNodeStatus(node *data.Node) {
 		switch child.Status {
 		case data.Active:
 			hasActive = true
-		case data.Inactive:
+		case data.Alarmed:
 			hasInactive = true
 		case data.Unknown:
 			hasUnknown = true
@@ -102,7 +102,7 @@ func determineNodeStatus(node *data.Node) {
 	case hasActive:
 		node.Status = data.Active
 	case hasInactive:
-		node.Status = data.Inactive
+		node.Status = data.Alarmed
 	case hasUnknown:
 		node.Status = data.Unknown
 	}
@@ -133,14 +133,10 @@ func drawGraphs(node *data.Node) error {
 
 func walk(g graph.Graph[int, int], n *data.Node) error {
 	var attr func(*graph.VertexProperties)
-	if n.RootCause {
-		attr = graph.VertexAttribute("color", "blue")
-	} else {
-		attr = graph.VertexAttribute("color", "black")
-	}
+	attr = graph.VertexAttribute("color", "black")
 
 	switch n.Status {
-	case data.Inactive:
+	case data.Alarmed:
 		attr = graph.VertexAttribute("color", "red")
 	case data.Active:
 		attr = graph.VertexAttribute("color", "green")
@@ -153,16 +149,12 @@ func walk(g graph.Graph[int, int], n *data.Node) error {
 		var attr func(*graph.VertexProperties)
 
 		switch child.Status {
-		case data.Inactive:
+		case data.Alarmed:
 			attr = graph.VertexAttribute("color", "red")
 		case data.Active:
 			attr = graph.VertexAttribute("color", "green")
 		default:
 			attr = graph.VertexAttribute("color", "black")
-		}
-
-		if child.RootCause {
-			attr = graph.VertexAttribute("color", "blue")
 		}
 
 		err := g.AddVertex(child.ID, graph.VertexAttribute("label", child.Name), attr)
