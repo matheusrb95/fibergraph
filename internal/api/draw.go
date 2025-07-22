@@ -99,7 +99,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 		}
 
 		for _, rootNode := range rootNodes {
-			err = core.Run(rootNode, true, true, false)
+			err = core.Run(rootNode, false, true, false)
 			if err != nil {
 				serverErrorResponse(w, r, logger, err)
 				return
@@ -125,7 +125,7 @@ func buildNetworkWithConnection(
 	for _, connection := range connections {
 		upsertConnectionMap(nodes, connection)
 
-		if connection.ParentIDs == nil {
+		if connection.CentralOffice {
 			result = append(result, nodes[connection.ID])
 		}
 	}
@@ -283,15 +283,13 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 
 			componentNode.SetParents(segmentNodes[parentID])
 
-			if componentNode.Children == nil {
-				switch segmentNodes[parentID].Status {
-				case data.Active:
-					hasActive = true
-				case data.Alarmed:
-					hasInactive = true
-				case data.Unknown:
-					hasUnknown = true
-				}
+			switch segmentNodes[parentID].Status {
+			case data.Active:
+				hasActive = true
+			case data.Alarmed:
+				hasInactive = true
+			case data.Unknown:
+				hasUnknown = true
 			}
 		}
 

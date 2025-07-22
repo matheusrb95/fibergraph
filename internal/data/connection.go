@@ -8,10 +8,11 @@ import (
 )
 
 type Connection struct {
-	ID          int
-	Name        string
-	ParentIDs   *string
-	ChildrenIDs *string
+	ID            int
+	Name          string
+	ParentIDs     *string
+	ChildrenIDs   *string
+	CentralOffice bool
 }
 
 type ConnectionModel struct {
@@ -51,8 +52,11 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 		SELECT 
 			p1.port_network_component_id,
 			nc.nc_name,
-			GROUP_CONCAT(p2.port_network_component_id) AS parent,
-			GROUP_CONCAT(p3.port_network_component_id) AS children
+			CASE
+				WHEN d.dio_network_component_id IS NOT NULL THEN d.dio_co_network_component_id ELSE GROUP_CONCAT(p2.port_network_component_id)
+			END AS parent,
+			GROUP_CONCAT(p3.port_network_component_id) AS children,
+			false
 		FROM
 			port p1
 			LEFT OUTER JOIN network_component nc ON nc.nc_id = p1.port_network_component_id
@@ -91,10 +95,29 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 		GROUP BY
 			p1.port_network_component_id
 		HAVING
-			parent IS NOT NULL OR children IS NOT NULL;
+			parent IS NOT NULL OR children IS NOT NULL
+			
+		UNION ALL
+
+		SELECT
+			c.co_network_component_id,
+			nc.nc_name,
+			null,
+			group_concat(d.dio_network_component_id),
+			true
+		FROM
+			co c
+			LEFT OUTER JOIN network_component nc ON nc.nc_id = c.co_network_component_id
+			LEFT OUTER JOIN dio d ON d.dio_co_network_component_id = c.co_network_component_id
+			LEFT OUTER JOIN project_network_component pnc ON pnc.pnc_network_component_id = nc.nc_id
+		WHERE
+			pnc.pnc_project_id = ?
+		GROUP BY 
+			c.co_network_component_id;
 	`
 
-	rows, err := tx.QueryContext(ctx, query, projectID, projectID, projectID, projectID)
+	args := []any{projectID, projectID, projectID, projectID, projectID}
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +131,7 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 			&connection.Name,
 			&connection.ParentIDs,
 			&connection.ChildrenIDs,
+			&connection.CentralOffice,
 		)
 		if err != nil {
 			return nil, err
