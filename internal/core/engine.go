@@ -12,14 +12,10 @@ import (
 
 var counter int
 
-func Run(node *correlation.Node, determine, draw, sensor bool) error {
+func Run(node *correlation.Node, draw, sensor bool) error {
 	root := findRoot(node)
 	if sensor {
 		propagateSensorStatus(node)
-	}
-
-	if determine {
-		determineNodeStatus(node)
 	}
 
 	if !draw {
@@ -81,36 +77,6 @@ func inactiveAllBelow(node *correlation.Node) {
 	for _, child := range node.Children {
 		inactiveAllBelow(child)
 		child.Status = correlation.Alarmed
-	}
-}
-
-func determineNodeStatus(node *correlation.Node) {
-	if node.Children == nil {
-		return
-	}
-
-	var hasActive, hasInactive, hasUnknown bool
-
-	for _, child := range node.Children {
-		determineNodeStatus(child)
-
-		switch child.Status {
-		case correlation.Active:
-			hasActive = true
-		case correlation.Alarmed:
-			hasInactive = true
-		case correlation.Unknown:
-			hasUnknown = true
-		}
-	}
-
-	switch {
-	case hasActive:
-		node.Status = correlation.Active
-	case hasInactive:
-		node.Status = correlation.Alarmed
-	case hasUnknown:
-		node.Status = correlation.Unknown
 	}
 }
 
