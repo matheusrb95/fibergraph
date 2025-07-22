@@ -47,7 +47,7 @@ type Node struct {
 	Type     NodeType
 	Status   Status
 	Children []*Node
-	Parent   *Node
+	Parents  []*Node
 }
 
 func NewNode(id int, name string, nodeType NodeType) *Node {
@@ -59,20 +59,22 @@ func NewNode(id int, name string, nodeType NodeType) *Node {
 	}
 }
 
-func (n *Node) SetParent(node *Node) {
-	n.Parent = node
-	node.addChildren(n)
+func (n *Node) SetParents(nodes ...*Node) {
+	n.Parents = append(n.Parents, nodes...)
+	for _, node := range nodes {
+		node.addChildren(n)
+	}
 }
 
 func (n *Node) SetChildren(nodes ...*Node) {
 	n.Children = append(n.Children, nodes...)
 	for _, node := range nodes {
-		node.addParent(n)
+		node.addParents(n)
 	}
 }
 
-func (n *Node) addParent(node *Node) {
-	n.Parent = node
+func (n *Node) addParents(nodes ...*Node) {
+	n.Parents = append(n.Parents, nodes...)
 }
 
 func (n *Node) addChildren(nodes ...*Node) {

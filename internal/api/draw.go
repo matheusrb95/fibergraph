@@ -156,7 +156,7 @@ func buildNetworkWithConnection(
 		// status = data.Unknown
 		// }
 		node.Status = status
-		node.SetParent(fiberNode)
+		node.SetParents(fiberNode)
 	}
 
 	for _, connection := range connections {
@@ -174,7 +174,7 @@ func buildNetworkWithConnection(
 			continue
 		}
 		node := nodes[connection.ID]
-		node.SetParent(parentNode)
+		node.SetParents(parentNode)
 	}
 
 	return result
@@ -281,7 +281,7 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 				continue
 			}
 
-			componentNode.SetParent(segmentNodes[parentID])
+			componentNode.SetParents(segmentNodes[parentID])
 
 			if componentNode.Children == nil {
 				switch segmentNodes[parentID].Status {
@@ -293,8 +293,6 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 					hasUnknown = true
 				}
 			}
-
-			break
 		}
 
 		switch {

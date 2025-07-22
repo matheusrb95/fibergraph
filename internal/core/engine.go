@@ -30,8 +30,8 @@ func Run(node *data.Node, determine, draw, sensor bool) error {
 }
 
 func findRoot(node *data.Node) *data.Node {
-	for node.Parent != nil {
-		node = node.Parent
+	for node.Parents != nil {
+		node = node.Parents[0]
 	}
 
 	return node
@@ -51,7 +51,7 @@ func propagateSensorStatus(node *data.Node) {
 
 		switch child.Status {
 		case data.Active:
-			activeAllAbove(child)
+			activeAllAbove(node)
 		case data.Alarmed:
 			inactiveAllBelow(node)
 		}
@@ -59,9 +59,15 @@ func propagateSensorStatus(node *data.Node) {
 }
 
 func activeAllAbove(node *data.Node) {
-	for node.Parent != nil {
-		node.Status = data.Active
-		node = node.Parent
+	if node.Parents == nil {
+		return
+	}
+
+	node.Status = data.Active
+
+	for _, parent := range node.Parents {
+		activeAllAbove(parent)
+		parent.Status = data.Active
 	}
 }
 
