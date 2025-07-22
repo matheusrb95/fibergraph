@@ -1,6 +1,7 @@
 package correlation
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -11,32 +12,81 @@ import (
 )
 
 type Correlation struct {
+	Connections    []*data.Connection
+	Sensors        []*data.Sensor
+	ActiveSensors  []string
+	AlarmedSensors []string
+	Segments       []*data.Segment
+	Components     []*data.Component
+
 	nodes map[int]*Node
 }
 
-func New() *Correlation {
-	return &Correlation{}
-}
-
-func BuildNetworkWithConnection(
-	nodes map[int]*Node,
+func New(
 	connections []*data.Connection,
 	sensors []*data.Sensor,
 	activeSensors []string,
 	alarmedSensors []string,
-) []*Node {
+	segments []*data.Segment,
+	components []*data.Component,
+) *Correlation {
+	return &Correlation{
+		Connections:    connections,
+		Sensors:        sensors,
+		ActiveSensors:  activeSensors,
+		AlarmedSensors: alarmedSensors,
+		Segments:       segments,
+		Components:     components,
+		nodes:          make(map[int]*Node),
+	}
+}
+
+func (c *Correlation) Run() error {
+	rootNodes := c.BuildNetworkWithConnection()
+
+	if len(rootNodes) == 0 {
+		return errors.New("no nodes")
+	}
+
+	for _, rootNode := range rootNodes {
+		err := Run(rootNode, true, true)
+		if err != nil {
+			return err
+		}
+		break
+	}
+
+	segmentNodes := c.BuildSegmentNodes()
+	rootNodes = c.BuildComponentNodes(segmentNodes)
+
+	if len(rootNodes) == 0 {
+		return errors.New("no nodes")
+	}
+
+	for _, rootNode := range rootNodes {
+		err := Run(rootNode, true, false)
+		if err != nil {
+			return err
+		}
+		break
+	}
+
+	return nil
+}
+
+func (c *Correlation) BuildNetworkWithConnection() []*Node {
 	result := make([]*Node, 0)
 
-	for _, connection := range connections {
-		upsertConnectionMap(nodes, connection)
+	for _, connection := range c.Connections {
+		c.upsertConnectionMap(connection)
 
 		if connection.CentralOffice {
-			result = append(result, nodes[connection.ID])
+			result = append(result, c.nodes[connection.ID])
 		}
 	}
 
-	for _, sensor := range sensors {
-		fiberNode, ok := nodes[sensor.FiberID]
+	for _, sensor := range c.Sensors {
+		fiberNode, ok := c.nodes[sensor.FiberID]
 		if !ok {
 			continue
 		}
@@ -45,9 +95,9 @@ func BuildNetworkWithConnection(
 		node := NewNode(sensor.ID+1_000_000, name, SensorNode)
 		var status Status
 
-		if slices.Contains(alarmedSensors, sensor.DevEUI) {
+		if slices.Contains(c.AlarmedSensors, sensor.DevEUI) {
 			status = Alarmed
-		} else if slices.Contains(activeSensors, sensor.DevEUI) {
+		} else if slices.Contains(c.ActiveSensors, sensor.DevEUI) {
 			status = Active
 		} else {
 			status = Unknown
@@ -64,7 +114,7 @@ func BuildNetworkWithConnection(
 		node.SetParents(fiberNode)
 	}
 
-	for _, connection := range connections {
+	for _, connection := range c.Connections {
 		if connection.ParentIDs == nil {
 			continue
 		}
@@ -74,30 +124,21 @@ func BuildNetworkWithConnection(
 			continue
 		}
 
-		parentNode, ok := nodes[parentID]
+		parentNode, ok := c.nodes[parentID]
 		if !ok {
 			continue
 		}
-		node := nodes[connection.ID]
+		node := c.nodes[connection.ID]
 		node.SetParents(parentNode)
 	}
 
 	return result
 }
 
-func upsertConnectionMap(nodes map[int]*Node, connection *data.Connection) {
-	if _, ok := nodes[connection.ID]; ok {
-		return
-	}
-
-	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
-	nodes[connection.ID] = NewNode(connection.ID, name, BoxNode)
-}
-
-func BuildSegmentNodes(nodes map[int]*Node, segments []*data.Segment) map[int]*Node {
+func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 	result := make(map[int]*Node)
 
-	for _, segment := range segments {
+	for _, segment := range c.Segments {
 		if segment.FiberIDs == nil {
 			continue
 		}
@@ -114,7 +155,7 @@ func BuildSegmentNodes(nodes map[int]*Node, segments []*data.Segment) map[int]*N
 				continue
 			}
 
-			node, ok := nodes[fiberID]
+			node, ok := c.nodes[fiberID]
 			if !ok {
 				continue
 			}
@@ -144,10 +185,10 @@ func BuildSegmentNodes(nodes map[int]*Node, segments []*data.Segment) map[int]*N
 	return result
 }
 
-func BuildComponentNodes(components []*data.Component, segmentNodes map[int]*Node) []*Node {
+func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 	result := make([]*Node, 0)
 
-	for _, component := range components {
+	for _, component := range c.Components {
 		name := fmt.Sprintf("%d - %s", component.ID, component.Name)
 		componentNode := NewNode(component.ID, name, BoxNode)
 
@@ -213,4 +254,13 @@ func BuildComponentNodes(components []*data.Component, segmentNodes map[int]*Nod
 	}
 
 	return result
+}
+
+func (c *Correlation) upsertConnectionMap(connection *data.Connection) {
+	if _, ok := c.nodes[connection.ID]; ok {
+		return
+	}
+
+	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
+	c.nodes[connection.ID] = NewNode(connection.ID, name, BoxNode)
 }

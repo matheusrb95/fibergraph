@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 
@@ -70,40 +69,10 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			"components_len", len(components),
 		)
 
-		nodes := make(map[int]*correlation.Node)
-
-		rootNodes := correlation.BuildNetworkWithConnection(nodes, connections, sensors, sensorStatus.Active, sensorStatus.Alarmed)
-
-		if len(rootNodes) == 0 {
-			badRequestResponse(w, r, logger, errors.New("no nodes"))
+		c := correlation.New(connections, sensors, sensorStatus.Active, sensorStatus.Alarmed, segments, components)
+		if err := c.Run(); err != nil {
+			serverErrorResponse(w, r, logger, err)
 			return
-		}
-
-		for _, rootNode := range rootNodes {
-			err = correlation.Run(rootNode, true, true)
-			if err != nil {
-				serverErrorResponse(w, r, logger, err)
-				return
-			}
-			break
-		}
-
-		segmentNodes := correlation.BuildSegmentNodes(nodes, segments)
-
-		rootNodes = correlation.BuildComponentNodes(components, segmentNodes)
-
-		if len(rootNodes) == 0 {
-			badRequestResponse(w, r, logger, errors.New("no nodes"))
-			return
-		}
-
-		for _, rootNode := range rootNodes {
-			err = correlation.Run(rootNode, true, false)
-			if err != nil {
-				serverErrorResponse(w, r, logger, err)
-				return
-			}
-			break
 		}
 
 		err = response.JSON(w, http.StatusCreated, response.Envelope{"message": "draw done"})
