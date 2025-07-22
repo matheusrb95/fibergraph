@@ -1,4 +1,4 @@
-package data
+package correlation
 
 type (
 	NodeType int

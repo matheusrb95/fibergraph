@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/matheusrb95/fibergraph/internal/core"
+	"github.com/matheusrb95/fibergraph/internal/correlation"
 	"github.com/matheusrb95/fibergraph/internal/data"
 	"github.com/matheusrb95/fibergraph/internal/request"
 	"github.com/matheusrb95/fibergraph/internal/response"
@@ -53,7 +54,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		nodes := make(map[int]*data.Node)
+		nodes := make(map[int]*correlation.Node)
 
 		rootNodes := buildNetworkWithConnection(nodes, connections, sensors, sensorStatus.Active, sensorStatus.Alarmed)
 
@@ -114,13 +115,13 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 }
 
 func buildNetworkWithConnection(
-	nodes map[int]*data.Node,
+	nodes map[int]*correlation.Node,
 	connections []*data.Connection,
 	sensors []*data.Sensor,
 	activeSensors []string,
 	alarmedSensors []string,
-) []*data.Node {
-	result := make([]*data.Node, 0)
+) []*correlation.Node {
+	result := make([]*correlation.Node, 0)
 
 	for _, connection := range connections {
 		upsertConnectionMap(nodes, connection)
@@ -137,23 +138,23 @@ func buildNetworkWithConnection(
 		}
 
 		name := fmt.Sprintf("%d - SPD", sensor.ID)
-		node := data.NewNode(sensor.ID+1_000_000, name, data.SensorNode)
-		var status data.Status
+		node := correlation.NewNode(sensor.ID+1_000_000, name, correlation.SensorNode)
+		var status correlation.Status
 
 		if slices.Contains(alarmedSensors, sensor.DevEUI) {
-			status = data.Alarmed
+			status = correlation.Alarmed
 		} else if slices.Contains(activeSensors, sensor.DevEUI) {
-			status = data.Active
+			status = correlation.Active
 		} else {
-			status = data.Unknown
+			status = correlation.Unknown
 		}
 		// switch sensor.Status {
 		// case "ACTIVE":
-		// status = data.Active
+		// status = correlation.Active
 		// case "ALARMED":
-		// status = data.Alarmed
+		// status = correlation.Alarmed
 		// default:
-		// status = data.Unknown
+		// status = correlation.Unknown
 		// }
 		node.Status = status
 		node.SetParents(fiberNode)
@@ -180,17 +181,17 @@ func buildNetworkWithConnection(
 	return result
 }
 
-func upsertConnectionMap(nodes map[int]*data.Node, connection *data.Connection) {
+func upsertConnectionMap(nodes map[int]*correlation.Node, connection *data.Connection) {
 	if _, ok := nodes[connection.ID]; ok {
 		return
 	}
 
 	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
-	nodes[connection.ID] = data.NewNode(connection.ID, name, data.BoxNode)
+	nodes[connection.ID] = correlation.NewNode(connection.ID, name, correlation.BoxNode)
 }
 
-func buildSegmentNodes(nodes map[int]*data.Node, segments []*data.Segment) map[int]*data.Node {
-	result := make(map[int]*data.Node)
+func buildSegmentNodes(nodes map[int]*correlation.Node, segments []*data.Segment) map[int]*correlation.Node {
+	result := make(map[int]*correlation.Node)
 
 	for _, segment := range segments {
 		if segment.FiberIDs == nil {
@@ -198,7 +199,7 @@ func buildSegmentNodes(nodes map[int]*data.Node, segments []*data.Segment) map[i
 		}
 
 		name := fmt.Sprintf("%d - segment", segment.ID)
-		segmentNode := data.NewNode(segment.ID, name, data.SegmentNode)
+		segmentNode := correlation.NewNode(segment.ID, name, correlation.SegmentNode)
 
 		var hasActive, hasInactive, hasUnknown bool
 
@@ -215,22 +216,22 @@ func buildSegmentNodes(nodes map[int]*data.Node, segments []*data.Segment) map[i
 			}
 
 			switch node.Status {
-			case data.Active:
+			case correlation.Active:
 				hasActive = true
-			case data.Alarmed:
+			case correlation.Alarmed:
 				hasInactive = true
-			case data.Unknown:
+			case correlation.Unknown:
 				hasUnknown = true
 			}
 		}
 
 		switch {
 		case hasActive:
-			segmentNode.Status = data.Active
+			segmentNode.Status = correlation.Active
 		case hasInactive:
-			segmentNode.Status = data.Alarmed
+			segmentNode.Status = correlation.Alarmed
 		case hasUnknown:
-			segmentNode.Status = data.Unknown
+			segmentNode.Status = correlation.Unknown
 		}
 
 		result[segment.ID] = segmentNode
@@ -239,12 +240,12 @@ func buildSegmentNodes(nodes map[int]*data.Node, segments []*data.Segment) map[i
 	return result
 }
 
-func buildComponentNodes(components []*data.Component, segmentNodes map[int]*data.Node) []*data.Node {
-	result := make([]*data.Node, 0)
+func buildComponentNodes(components []*data.Component, segmentNodes map[int]*correlation.Node) []*correlation.Node {
+	result := make([]*correlation.Node, 0)
 
 	for _, component := range components {
 		name := fmt.Sprintf("%d - %s", component.ID, component.Name)
-		componentNode := data.NewNode(component.ID, name, data.BoxNode)
+		componentNode := correlation.NewNode(component.ID, name, correlation.BoxNode)
 
 		childrenIDs := []string{}
 		if component.ChildrenIDs != nil {
@@ -284,22 +285,22 @@ func buildComponentNodes(components []*data.Component, segmentNodes map[int]*dat
 			componentNode.SetParents(segmentNodes[parentID])
 
 			switch segmentNodes[parentID].Status {
-			case data.Active:
+			case correlation.Active:
 				hasActive = true
-			case data.Alarmed:
+			case correlation.Alarmed:
 				hasInactive = true
-			case data.Unknown:
+			case correlation.Unknown:
 				hasUnknown = true
 			}
 		}
 
 		switch {
 		case hasActive:
-			componentNode.Status = data.Active
+			componentNode.Status = correlation.Active
 		case hasInactive:
-			componentNode.Status = data.Alarmed
+			componentNode.Status = correlation.Alarmed
 		case hasUnknown:
-			componentNode.Status = data.Unknown
+			componentNode.Status = correlation.Unknown
 		}
 
 		if component.ParentIDs == nil {

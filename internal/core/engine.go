@@ -7,12 +7,12 @@ import (
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
 
-	"github.com/matheusrb95/fibergraph/internal/data"
+	"github.com/matheusrb95/fibergraph/internal/correlation"
 )
 
 var counter int
 
-func Run(node *data.Node, determine, draw, sensor bool) error {
+func Run(node *correlation.Node, determine, draw, sensor bool) error {
 	root := findRoot(node)
 	if sensor {
 		propagateSensorStatus(node)
@@ -29,7 +29,7 @@ func Run(node *data.Node, determine, draw, sensor bool) error {
 	return drawGraphs(root)
 }
 
-func findRoot(node *data.Node) *data.Node {
+func findRoot(node *correlation.Node) *correlation.Node {
 	for node.Parents != nil {
 		node = node.Parents[0]
 	}
@@ -37,7 +37,7 @@ func findRoot(node *data.Node) *data.Node {
 	return node
 }
 
-func propagateSensorStatus(node *data.Node) {
+func propagateSensorStatus(node *correlation.Node) {
 	if node.Children == nil {
 		return
 	}
@@ -45,46 +45,46 @@ func propagateSensorStatus(node *data.Node) {
 	for _, child := range node.Children {
 		propagateSensorStatus(child)
 
-		if child.Type != data.SensorNode {
+		if child.Type != correlation.SensorNode {
 			continue
 		}
 
 		switch child.Status {
-		case data.Active:
+		case correlation.Active:
 			activeAllAbove(node)
-		case data.Alarmed:
+		case correlation.Alarmed:
 			inactiveAllBelow(node)
 		}
 	}
 }
 
-func activeAllAbove(node *data.Node) {
+func activeAllAbove(node *correlation.Node) {
 	if node.Parents == nil {
 		return
 	}
 
-	node.Status = data.Active
+	node.Status = correlation.Active
 
 	for _, parent := range node.Parents {
 		activeAllAbove(parent)
-		parent.Status = data.Active
+		parent.Status = correlation.Active
 	}
 }
 
-func inactiveAllBelow(node *data.Node) {
+func inactiveAllBelow(node *correlation.Node) {
 	if node.Children == nil {
 		return
 	}
 
-	node.Status = data.Alarmed
+	node.Status = correlation.Alarmed
 
 	for _, child := range node.Children {
 		inactiveAllBelow(child)
-		child.Status = data.Alarmed
+		child.Status = correlation.Alarmed
 	}
 }
 
-func determineNodeStatus(node *data.Node) {
+func determineNodeStatus(node *correlation.Node) {
 	if node.Children == nil {
 		return
 	}
@@ -95,26 +95,26 @@ func determineNodeStatus(node *data.Node) {
 		determineNodeStatus(child)
 
 		switch child.Status {
-		case data.Active:
+		case correlation.Active:
 			hasActive = true
-		case data.Alarmed:
+		case correlation.Alarmed:
 			hasInactive = true
-		case data.Unknown:
+		case correlation.Unknown:
 			hasUnknown = true
 		}
 	}
 
 	switch {
 	case hasActive:
-		node.Status = data.Active
+		node.Status = correlation.Active
 	case hasInactive:
-		node.Status = data.Alarmed
+		node.Status = correlation.Alarmed
 	case hasUnknown:
-		node.Status = data.Unknown
+		node.Status = correlation.Unknown
 	}
 }
 
-func drawGraphs(node *data.Node) error {
+func drawGraphs(node *correlation.Node) error {
 	g := graph.New(graph.IntHash, graph.Directed())
 
 	err := walk(g, node)
@@ -137,14 +137,14 @@ func drawGraphs(node *data.Node) error {
 	return nil
 }
 
-func walk(g graph.Graph[int, int], n *data.Node) error {
+func walk(g graph.Graph[int, int], n *correlation.Node) error {
 	var attr func(*graph.VertexProperties)
 	attr = graph.VertexAttribute("color", "black")
 
 	switch n.Status {
-	case data.Alarmed:
+	case correlation.Alarmed:
 		attr = graph.VertexAttribute("color", "red")
-	case data.Active:
+	case correlation.Active:
 		attr = graph.VertexAttribute("color", "green")
 	default:
 		attr = graph.VertexAttribute("color", "black")
@@ -155,9 +155,9 @@ func walk(g graph.Graph[int, int], n *data.Node) error {
 		var attr func(*graph.VertexProperties)
 
 		switch child.Status {
-		case data.Alarmed:
+		case correlation.Alarmed:
 			attr = graph.VertexAttribute("color", "red")
-		case data.Active:
+		case correlation.Active:
 			attr = graph.VertexAttribute("color", "green")
 		default:
 			attr = graph.VertexAttribute("color", "black")
