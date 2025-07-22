@@ -15,7 +15,7 @@ type SensorStatus struct {
 	Alarmed []string `json:"alarmed_sensors"`
 }
 
-func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
+func HandleCorrelation(logger *slog.Logger, models *data.Models) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tenantID := r.PathValue("tenant_id")
 		if tenantID == "" {
@@ -75,7 +75,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		err = response.JSON(w, http.StatusCreated, response.Envelope{"message": "draw done"})
+		err = response.JSON(w, http.StatusOK, response.Envelope{"correlation": "done"})
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 		}
