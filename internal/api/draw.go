@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/matheusrb95/fibergraph/internal/core"
 	"github.com/matheusrb95/fibergraph/internal/correlation"
 	"github.com/matheusrb95/fibergraph/internal/data"
 	"github.com/matheusrb95/fibergraph/internal/request"
@@ -81,7 +80,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 		}
 
 		for _, rootNode := range rootNodes {
-			err = core.Run(rootNode, true, true)
+			err = correlation.Run(rootNode, true, true)
 			if err != nil {
 				serverErrorResponse(w, r, logger, err)
 				return
@@ -99,7 +98,7 @@ func HandleDraw(logger *slog.Logger, models *data.Models) http.Handler {
 		}
 
 		for _, rootNode := range rootNodes {
-			err = core.Run(rootNode, true, false)
+			err = correlation.Run(rootNode, true, false)
 			if err != nil {
 				serverErrorResponse(w, r, logger, err)
 				return
