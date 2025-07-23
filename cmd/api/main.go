@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/matheusrb95/fibergraph/internal/api"
+	"github.com/matheusrb95/fibergraph/internal/aws"
 	"github.com/matheusrb95/fibergraph/internal/data"
 	"github.com/matheusrb95/fibergraph/internal/database"
 
@@ -33,14 +34,20 @@ func run(ctx context.Context) error {
 
 	_ = godotenv.Load()
 
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
+	if err != nil {
+		return fmt.Errorf("load aws config. %w", err)
+	}
+
 	db, err := database.OpenDB()
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("open db. %w", err)
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	models := data.NewModels(db)
-	srv := api.NewServer(logger, models)
+	services := aws.NewServices(cfg)
+	srv := api.NewServer(logger, models, services)
 
 	httpServer := &http.Server{
 		Addr:    ":4000",
