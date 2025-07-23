@@ -49,11 +49,7 @@ func (c *Correlation) Run() error {
 	}
 
 	for _, rootNode := range rootNodes {
-		err := Run(rootNode, true, true)
-		if err != nil {
-			return err
-		}
-		break
+		propagateSensorStatus(rootNode)
 	}
 
 	segmentNodes := c.BuildSegmentNodes()
@@ -64,11 +60,10 @@ func (c *Correlation) Run() error {
 	}
 
 	for _, rootNode := range rootNodes {
-		err := Run(rootNode, true, false)
+		err := drawGraphs(rootNode)
 		if err != nil {
 			return err
 		}
-		break
 	}
 
 	return nil
@@ -263,4 +258,51 @@ func (c *Correlation) upsertConnectionMap(connection *data.Connection) {
 
 	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
 	c.nodes[connection.ID] = NewNode(connection.ID, name, BoxNode)
+}
+
+func propagateSensorStatus(node *Node) {
+	if node.Children == nil {
+		return
+	}
+
+	for _, child := range node.Children {
+		propagateSensorStatus(child)
+
+		if child.Type != SensorNode {
+			continue
+		}
+
+		switch child.Status {
+		case Active:
+			activeAllAbove(node)
+		case Alarmed:
+			inactiveAllBelow(node)
+		}
+	}
+}
+
+func activeAllAbove(node *Node) {
+	if node.Parents == nil {
+		return
+	}
+
+	node.Status = Active
+
+	for _, parent := range node.Parents {
+		activeAllAbove(parent)
+		parent.Status = Active
+	}
+}
+
+func inactiveAllBelow(node *Node) {
+	if node.Children == nil {
+		return
+	}
+
+	node.Status = Alarmed
+
+	for _, child := range node.Children {
+		inactiveAllBelow(child)
+		child.Status = Alarmed
+	}
 }

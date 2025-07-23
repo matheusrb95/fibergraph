@@ -20,7 +20,7 @@ type ConnectionModel struct {
 }
 
 func (m *ConnectionModel) GetAll(tenantID, projectID string) ([]*Connection, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	tx, err := m.DB.BeginTx(ctx, nil)
@@ -82,6 +82,14 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 			LEFT OUTER JOIN network_component nc4 ON nc4.nc_id = d.dio_network_component_id
 			LEFT OUTER JOIN project_network_component pnc4 ON pnc4.pnc_network_component_id = nc4.nc_id
 
+			LEFT OUTER JOIN onu o ON o.onu_network_component_id = p1.port_network_component_id
+			LEFT OUTER JOIN network_component nc5 ON nc5.nc_id = o.onu_network_component_id
+			LEFT OUTER JOIN project_network_component pnc5 ON pnc5.pnc_network_component_id = nc5.nc_id
+
+			LEFT OUTER JOIN cto cto2 ON cto2.cto_network_component_id = p1.port_network_component_id
+			LEFT OUTER JOIN network_component nc6 ON nc6.nc_id = cto2.cto_network_component_id
+			LEFT OUTER JOIN project_network_component pnc6 ON pnc6.pnc_network_component_id = nc6.nc_id
+
 			LEFT OUTER JOIN port p2 ON p2.port_id = p1.port_connected_to_port_id AND p1.optical_signal_direction = 'RX'
 			LEFT OUTER JOIN port p3 ON p3.port_id = p1.port_connected_to_port_id AND p1.optical_signal_direction = 'TX'
 		WHERE
@@ -91,6 +99,8 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 				OR pnc2.pnc_project_id = ?
 				OR pnc3.pnc_project_id = ?
 				OR pnc4.pnc_project_id = ?
+				OR pnc5.pnc_project_id = ?
+				OR pnc6.pnc_project_id = ?
 			)
 		GROUP BY
 			p1.port_network_component_id
@@ -116,7 +126,7 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 			c.co_network_component_id;
 	`
 
-	args := []any{projectID, projectID, projectID, projectID, projectID}
+	args := []any{projectID, projectID, projectID, projectID, projectID, projectID, projectID}
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
