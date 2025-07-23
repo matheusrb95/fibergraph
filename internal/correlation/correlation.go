@@ -14,8 +14,11 @@ import (
 type Correlation struct {
 	Connections    []*data.Connection
 	Sensors        []*data.Sensor
+	ONUs           []*data.ONU
 	ActiveSensors  []string
 	AlarmedSensors []string
+	ActiveONUs     []string
+	AlarmedONUs    []string
 	Segments       []*data.Segment
 	Components     []*data.Component
 
@@ -25,16 +28,22 @@ type Correlation struct {
 func New(
 	connections []*data.Connection,
 	sensors []*data.Sensor,
+	onus []*data.ONU,
 	activeSensors []string,
 	alarmedSensors []string,
+	activeONUs []string,
+	alarmedONUs []string,
 	segments []*data.Segment,
 	components []*data.Component,
 ) *Correlation {
 	return &Correlation{
 		Connections:    connections,
 		Sensors:        sensors,
+		ONUs:           onus,
 		ActiveSensors:  activeSensors,
 		AlarmedSensors: alarmedSensors,
+		ActiveONUs:     activeONUs,
+		AlarmedONUs:    alarmedONUs,
 		Segments:       segments,
 		Components:     components,
 		nodes:          make(map[int]*Node),
@@ -50,6 +59,11 @@ func (c *Correlation) Run() error {
 
 	for _, rootNode := range rootNodes {
 		propagateSensorStatus(rootNode)
+		propagateONUStatus(rootNode)
+		err := drawGraphs(rootNode)
+		if err != nil {
+			return err
+		}
 	}
 
 	segmentNodes := c.BuildSegmentNodes()
@@ -109,22 +123,48 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 		node.SetParents(fiberNode)
 	}
 
+	for _, onu := range c.ONUs {
+		onuNode, ok := c.nodes[onu.ID]
+		if !ok {
+			continue
+		}
+
+		var status Status
+		if slices.Contains(c.AlarmedONUs, onu.Serial) {
+			status = Alarmed
+		} else if slices.Contains(c.ActiveONUs, onu.Serial) {
+			status = Active
+		} else {
+			status = Unknown
+		}
+
+		onuNode.Type = ONUNode
+		onuNode.Status = status
+	}
+
 	for _, connection := range c.Connections {
 		if connection.ParentIDs == nil {
 			continue
 		}
 
-		parentID, err := strconv.Atoi(*connection.ParentIDs)
-		if err != nil {
-			continue
+		parentIDs := []string{}
+		if connection.ParentIDs != nil {
+			parentIDs = strings.Split(*connection.ParentIDs, ",")
 		}
+		for _, parentID := range parentIDs {
+			parentID, err := strconv.Atoi(parentID)
+			if err != nil {
+				continue
+			}
 
-		parentNode, ok := c.nodes[parentID]
-		if !ok {
-			continue
+			parentNode, ok := c.nodes[parentID]
+			if !ok {
+				continue
+			}
+
+			node := c.nodes[connection.ID]
+			node.SetParents(parentNode)
 		}
-		node := c.nodes[connection.ID]
-		node.SetParents(parentNode)
 	}
 
 	return result
@@ -269,6 +309,27 @@ func propagateSensorStatus(node *Node) {
 		propagateSensorStatus(child)
 
 		if child.Type != SensorNode {
+			continue
+		}
+
+		switch child.Status {
+		case Active:
+			activeAllAbove(node)
+		case Alarmed:
+			inactiveAllBelow(node)
+		}
+	}
+}
+
+func propagateONUStatus(node *Node) {
+	if node.Children == nil {
+		return
+	}
+
+	for _, child := range node.Children {
+		propagateONUStatus(child)
+
+		if child.Type != ONUNode {
 			continue
 		}
 

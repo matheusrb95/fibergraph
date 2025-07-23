@@ -10,9 +10,11 @@ import (
 	"github.com/matheusrb95/fibergraph/internal/response"
 )
 
-type SensorStatus struct {
-	Active  []string `json:"active_sensors"`
-	Alarmed []string `json:"alarmed_sensors"`
+type EquipmentStatus struct {
+	ActiveSensors  []string `json:"active_sensors"`
+	AlarmedSensors []string `json:"alarmed_sensors"`
+	ActiveONUs     []string `json:"active_onus"`
+	AlarmedONUs    []string `json:"alarmed_onus"`
 }
 
 func HandleCorrelation(logger *slog.Logger, models *data.Models) http.Handler {
@@ -29,8 +31,8 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models) http.Handler {
 			return
 		}
 
-		var sensorStatus SensorStatus
-		err := request.DecodeJSON(w, r, &sensorStatus)
+		var equipmentStatus EquipmentStatus
+		err := request.DecodeJSON(w, r, &equipmentStatus)
 		if err != nil {
 			badRequestResponse(w, r, logger, err)
 			return
@@ -43,6 +45,12 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models) http.Handler {
 		}
 
 		sensors, err := models.Sensor.GetAll(tenantID, projectID)
+		if err != nil {
+			serverErrorResponse(w, r, logger, err)
+			return
+		}
+
+		onus, err := models.ONU.GetAll(tenantID, projectID)
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
@@ -65,11 +73,22 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models) http.Handler {
 			"project_id", projectID,
 			"connections_len", len(connections),
 			"sensors_len", len(sensors),
+			"onus_len", len(onus),
 			"segments_len", len(segments),
 			"components_len", len(components),
 		)
 
-		c := correlation.New(connections, sensors, sensorStatus.Active, sensorStatus.Alarmed, segments, components)
+		c := correlation.New(
+			connections,
+			sensors,
+			onus,
+			equipmentStatus.ActiveSensors,
+			equipmentStatus.AlarmedSensors,
+			equipmentStatus.ActiveONUs,
+			equipmentStatus.AlarmedONUs,
+			segments,
+			components,
+		)
 		if err := c.Run(); err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
