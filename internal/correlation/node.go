@@ -11,6 +11,7 @@ const (
 	SplitterNode
 	SegmentNode
 	SensorNode
+	ONUNode
 )
 
 const (
@@ -25,6 +26,7 @@ var nodeName = map[NodeType]string{
 	SplitterNode: "Splitter",
 	SegmentNode:  "Segment",
 	SensorNode:   "Sensor",
+	ONUNode:      "ONU",
 }
 
 var statusName = map[Status]string{

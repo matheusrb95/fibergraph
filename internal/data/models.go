@@ -14,6 +14,7 @@ type Models struct {
 	Connection ConnectionModel
 	Segment    SegmentModel
 	Sensor     SensorModel
+	ONU        ONUModel
 }
 
 func NewModels(db *sql.DB) *Models {
@@ -22,6 +23,7 @@ func NewModels(db *sql.DB) *Models {
 		Connection: ConnectionModel{DB: db},
 		Segment:    SegmentModel{DB: db},
 		Sensor:     SensorModel{DB: db},
+		ONU:        ONUModel{DB: db},
 	}
 }
 
