@@ -19,6 +19,7 @@ const (
 const (
 	Active Status = iota
 	Alarmed
+	ProbablyAlarmed
 	Undefined
 )
 
@@ -34,9 +35,10 @@ var nodeName = map[NodeType]string{
 }
 
 var statusName = map[Status]string{
-	Active:    "Active",
-	Alarmed:   "Alarmed",
-	Undefined: "Undefined",
+	Active:          "Active",
+	Alarmed:         "Alarmed",
+	ProbablyAlarmed: "Probably_Alarmed",
+	Undefined:       "Undefined",
 }
 
 func (nt NodeType) String() string {

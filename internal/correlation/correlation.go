@@ -196,7 +196,7 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 		name := fmt.Sprintf("%d - segment", segment.ID)
 		segmentNode := NewNode(segment.ID, name, SegmentNode)
 
-		var hasActive, hasInactive, hasUndefined bool
+		var hasActive, hasAlarmed, hasProbablyAlarmed, hasUndefined bool
 
 		fiberIDs := strings.SplitSeq(*segment.FiberIDs, ",")
 		for fiberID := range fiberIDs {
@@ -214,7 +214,9 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 			case Active:
 				hasActive = true
 			case Alarmed:
-				hasInactive = true
+				hasAlarmed = true
+			case ProbablyAlarmed:
+				hasProbablyAlarmed = true
 			case Undefined:
 				hasUndefined = true
 			}
@@ -223,8 +225,10 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 		switch {
 		case hasActive:
 			segmentNode.Status = Active
-		case hasInactive:
+		case hasAlarmed:
 			segmentNode.Status = Alarmed
+		case hasProbablyAlarmed:
+			segmentNode.Status = ProbablyAlarmed
 		case hasUndefined:
 			segmentNode.Status = Undefined
 		}
@@ -272,7 +276,7 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 			componentNode.SetChildren(segmentNodes[childID])
 		}
 
-		var hasActive, hasInactive, hasUndefined bool
+		var hasActive, hasAlarmed, hasProbablyAlarmed, hasUndefined bool
 
 		parentIDs := []string{}
 		if component.ParentIDs != nil {
@@ -295,7 +299,9 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 			case Active:
 				hasActive = true
 			case Alarmed:
-				hasInactive = true
+				hasAlarmed = true
+			case ProbablyAlarmed:
+				hasProbablyAlarmed = true
 			case Undefined:
 				hasUndefined = true
 			}
@@ -304,8 +310,10 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 		switch {
 		case hasActive:
 			componentNode.Status = Active
-		case hasInactive:
+		case hasAlarmed:
 			componentNode.Status = Alarmed
+		case hasProbablyAlarmed:
+			componentNode.Status = ProbablyAlarmed
 		case hasUndefined:
 			componentNode.Status = Undefined
 		}
@@ -360,7 +368,8 @@ func propagateSensorStatus(node *Node) {
 		case Active:
 			activeAllAbove(node)
 		case Alarmed:
-			inactiveAllBelow(node)
+			alarmAllBelow(node)
+			probablyAlarmedAllAbove(node)
 		}
 	}
 }
@@ -381,7 +390,8 @@ func propagateONUStatus(node *Node) {
 		case Active:
 			activeAllAbove(node)
 		case Alarmed:
-			inactiveAllBelow(node)
+			alarmAllBelow(node)
+			probablyAlarmedAllAbove(node)
 		}
 	}
 }
@@ -399,7 +409,7 @@ func activeAllAbove(node *Node) {
 	}
 }
 
-func inactiveAllBelow(node *Node) {
+func alarmAllBelow(node *Node) {
 	if node.Children == nil {
 		return
 	}
@@ -407,7 +417,22 @@ func inactiveAllBelow(node *Node) {
 	node.Status = Alarmed
 
 	for _, child := range node.Children {
-		inactiveAllBelow(child)
+		alarmAllBelow(child)
 		child.Status = Alarmed
+	}
+}
+
+func probablyAlarmedAllAbove(node *Node) {
+	if node.Parents == nil {
+		return
+	}
+
+	for _, parent := range node.Parents {
+		probablyAlarmedAllAbove(parent)
+		if parent.Status == Active {
+			continue
+		}
+
+		parent.Status = ProbablyAlarmed
 	}
 }
