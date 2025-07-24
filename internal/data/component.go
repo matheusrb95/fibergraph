@@ -12,6 +12,7 @@ type Component struct {
 	Name        string
 	ParentIDs   *string
 	ChildrenIDs *string
+	Type        string
 }
 
 type ComponentModel struct {
@@ -52,11 +53,22 @@ func getComponents(ctx context.Context, tx *sql.Tx, projectID string) ([]*Compon
 			csc.csc_network_component_id,
 			nc.nc_name,
 			GROUP_CONCAT(CASE WHEN csc.csc_segment_point = 'END' THEN csc.csc_segment_id ELSE NULL END),
-			GROUP_CONCAT(CASE WHEN csc.csc_segment_point = 'START' THEN csc.csc_segment_id ELSE NULL END)
+			GROUP_CONCAT(CASE WHEN csc.csc_segment_point = 'START' THEN csc.csc_segment_id ELSE NULL END),
+			CASE
+				WHEN co.co_network_component_id IS NOT NULL THEN 'CO'
+				WHEN cto.cto_network_component_id IS NOT NULL THEN 'CTO'
+				WHEN ceo.ceo_network_component_id IS NOT NULL THEN 'CEO'
+				WHEN onu.onu_network_component_id IS NOT NULL THEN 'ONU'
+			END
 		FROM
 			component_segment_connection csc
 			LEFT OUTER JOIN network_component nc ON nc.nc_id = csc.csc_network_component_id
 			LEFT OUTER JOIN project_network_component pnc ON pnc_network_component_id = nc.nc_id
+			
+			LEFT OUTER JOIN co ON co.co_network_component_id = csc.csc_network_component_id
+			LEFT OUTER JOIN cto ON cto.cto_network_component_id = csc.csc_network_component_id
+			LEFT OUTER JOIN ceo ON ceo.ceo_network_component_id = csc.csc_network_component_id
+			LEFT OUTER JOIN onu ON onu.onu_network_component_id = csc.csc_network_component_id
 		WHERE
 			csc.csc_network_component_id IS NOT NULL
 			AND pnc.pnc_project_id = ?
@@ -78,6 +90,7 @@ func getComponents(ctx context.Context, tx *sql.Tx, projectID string) ([]*Compon
 			&component.Name,
 			&component.ParentIDs,
 			&component.ChildrenIDs,
+			&component.Type,
 		)
 		if err != nil {
 			return nil, err
