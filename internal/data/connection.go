@@ -8,11 +8,11 @@ import (
 )
 
 type Connection struct {
-	ID            int
-	Name          string
-	ParentIDs     *string
-	ChildrenIDs   *string
-	CentralOffice bool
+	ID          int
+	Name        string
+	ParentIDs   *string
+	ChildrenIDs *string
+	Type        string
 }
 
 type ConnectionModel struct {
@@ -56,7 +56,13 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 				WHEN d.dio_network_component_id IS NOT NULL THEN d.dio_co_network_component_id ELSE GROUP_CONCAT(p2.port_network_component_id)
 			END AS parent,
 			GROUP_CONCAT(p3.port_network_component_id) AS children,
-			false
+			CASE
+				WHEN f.fiber_id IS NOT NULL THEN 'Fiber'
+				WHEN s.splitter_network_component_id IS NOT NULL THEN 'Splitter'
+				WHEN d.dio_network_component_id IS NOT NULL THEN 'DIO'
+				WHEN o.onu_network_component_id IS NOT NULL THEN 'ONU'
+				WHEN cto2.cto_network_component_id IS NOT NULL THEN 'CTO'
+			END
 		FROM
 			port p1
 			LEFT OUTER JOIN network_component nc ON nc.nc_id = p1.port_network_component_id
@@ -114,7 +120,7 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 			nc.nc_name,
 			null,
 			group_concat(d.dio_network_component_id),
-			true
+			'CO'
 		FROM
 			co c
 			LEFT OUTER JOIN network_component nc ON nc.nc_id = c.co_network_component_id
@@ -141,7 +147,7 @@ func getConnections(ctx context.Context, tx *sql.Tx, projectID string) ([]*Conne
 			&connection.Name,
 			&connection.ParentIDs,
 			&connection.ChildrenIDs,
-			&connection.CentralOffice,
+			&connection.Type,
 		)
 		if err != nil {
 			return nil, err

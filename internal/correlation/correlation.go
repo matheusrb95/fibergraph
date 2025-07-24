@@ -50,6 +50,10 @@ func New(
 	}
 }
 
+func (c *Correlation) Result() map[int]*Node {
+	return c.nodes
+}
+
 func (c *Correlation) Run() error {
 	rootNodes := c.BuildNetworkWithConnection()
 
@@ -89,7 +93,7 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 	for _, connection := range c.Connections {
 		c.upsertConnectionMap(connection)
 
-		if connection.CentralOffice {
+		if connection.Type == "CO" {
 			result = append(result, c.nodes[connection.ID])
 		}
 	}
@@ -109,7 +113,7 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 		} else if slices.Contains(c.ActiveSensors, sensor.DevEUI) {
 			status = Active
 		} else {
-			status = Unknown
+			status = Undefined
 		}
 		// switch sensor.Status {
 		// case "ACTIVE":
@@ -117,7 +121,7 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 		// case "ALARMED":
 		// status = Alarmed
 		// default:
-		// status = Unknown
+		// status = Undefined
 		// }
 		node.Status = status
 		node.SetParents(fiberNode)
@@ -135,7 +139,7 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 		} else if slices.Contains(c.ActiveONUs, onu.Serial) {
 			status = Active
 		} else {
-			status = Unknown
+			status = Undefined
 		}
 
 		onuNode.Type = ONUNode
@@ -181,7 +185,7 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 		name := fmt.Sprintf("%d - segment", segment.ID)
 		segmentNode := NewNode(segment.ID, name, SegmentNode)
 
-		var hasActive, hasInactive, hasUnknown bool
+		var hasActive, hasInactive, hasUndefined bool
 
 		fiberIDs := strings.SplitSeq(*segment.FiberIDs, ",")
 		for fiberID := range fiberIDs {
@@ -200,8 +204,8 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 				hasActive = true
 			case Alarmed:
 				hasInactive = true
-			case Unknown:
-				hasUnknown = true
+			case Undefined:
+				hasUndefined = true
 			}
 		}
 
@@ -210,8 +214,8 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 			segmentNode.Status = Active
 		case hasInactive:
 			segmentNode.Status = Alarmed
-		case hasUnknown:
-			segmentNode.Status = Unknown
+		case hasUndefined:
+			segmentNode.Status = Undefined
 		}
 
 		result[segment.ID] = segmentNode
@@ -225,7 +229,7 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 
 	for _, component := range c.Components {
 		name := fmt.Sprintf("%d - %s", component.ID, component.Name)
-		componentNode := NewNode(component.ID, name, BoxNode)
+		componentNode := NewNode(component.ID, name, CTONode)
 
 		childrenIDs := []string{}
 		if component.ChildrenIDs != nil {
@@ -245,7 +249,7 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 			componentNode.SetChildren(segmentNodes[childID])
 		}
 
-		var hasActive, hasInactive, hasUnknown bool
+		var hasActive, hasInactive, hasUndefined bool
 
 		parentIDs := []string{}
 		if component.ParentIDs != nil {
@@ -269,8 +273,8 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 				hasActive = true
 			case Alarmed:
 				hasInactive = true
-			case Unknown:
-				hasUnknown = true
+			case Undefined:
+				hasUndefined = true
 			}
 		}
 
@@ -279,8 +283,8 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 			componentNode.Status = Active
 		case hasInactive:
 			componentNode.Status = Alarmed
-		case hasUnknown:
-			componentNode.Status = Unknown
+		case hasUndefined:
+			componentNode.Status = Undefined
 		}
 
 		if component.ParentIDs == nil {
@@ -297,7 +301,22 @@ func (c *Correlation) upsertConnectionMap(connection *data.Connection) {
 	}
 
 	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
-	c.nodes[connection.ID] = NewNode(connection.ID, name, BoxNode)
+	var nodeType NodeType
+	switch connection.Type {
+	case "CO":
+		nodeType = CONode
+	case "CTO":
+		nodeType = CTONode
+	case "ONU":
+		nodeType = ONUNode
+	case "Fiber":
+		nodeType = FiberNode
+	case "Splitter":
+		nodeType = SplitterNode
+	case "Sensor":
+		nodeType = SensorNode
+	}
+	c.nodes[connection.ID] = NewNode(connection.ID, name, nodeType)
 }
 
 func propagateSensorStatus(node *Node) {

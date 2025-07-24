@@ -6,7 +6,9 @@ type (
 )
 
 const (
-	BoxNode NodeType = iota
+	CTONode NodeType = iota
+	CEONode
+	CONode
 	FiberNode
 	SplitterNode
 	SegmentNode
@@ -17,11 +19,13 @@ const (
 const (
 	Active Status = iota
 	Alarmed
-	Unknown
+	Undefined
 )
 
 var nodeName = map[NodeType]string{
-	BoxNode:      "Box",
+	CTONode:      "CTO",
+	CEONode:      "CEO",
+	CONode:       "CO",
 	FiberNode:    "Fiber",
 	SplitterNode: "Splitter",
 	SegmentNode:  "Segment",
@@ -30,9 +34,9 @@ var nodeName = map[NodeType]string{
 }
 
 var statusName = map[Status]string{
-	Active:  "Active",
-	Alarmed: "Alarmed",
-	Unknown: "Unknown",
+	Active:    "Active",
+	Alarmed:   "Alarmed",
+	Undefined: "Undefined",
 }
 
 func (nt NodeType) String() string {
@@ -57,7 +61,7 @@ func NewNode(id int, name string, nodeType NodeType) *Node {
 		ID:     id,
 		Name:   name,
 		Type:   nodeType,
-		Status: Unknown,
+		Status: Undefined,
 	}
 }
 
