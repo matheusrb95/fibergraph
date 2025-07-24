@@ -28,3 +28,7 @@ create-sns-topics:
 	@for topic in $(SNS_TOPIC_NAMES); do \
 		aws --endpoint-url=$(SNS_ENDPOINT) sns create-topic --name $$topic --region $(AWS_REGION); \
 	done
+
+.PHONY: docker-build
+docker-build:
+	@docker build --network=host --tag correlation:$(VERSION) .
