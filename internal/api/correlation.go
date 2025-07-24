@@ -1,9 +1,15 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/matheusrb95/fibergraph/internal/aws"
 	"github.com/matheusrb95/fibergraph/internal/correlation"
 	"github.com/matheusrb95/fibergraph/internal/data"
 	"github.com/matheusrb95/fibergraph/internal/request"
@@ -17,7 +23,22 @@ type EquipmentStatus struct {
 	AlarmedONUs    []string `json:"alarmed_onus"`
 }
 
-func HandleCorrelation(logger *slog.Logger, models *data.Models) http.Handler {
+type SNSMessage struct {
+	Timestamp            time.Time `json:"timestamp"`
+	NetworkComponentType string    `json:"network_component_type"`
+	NetworkComponentID   string    `json:"network_component_id"`
+	Description          string    `json:"description"`
+	Status               string    `json:"status"`
+	AlarmedProbability   string    `json:"alarmedProbability"`
+	Last                 bool      `json:"last"`
+	RootID               int       `json:"rootID"`
+	ProjectID            int       `json:"projectID"`
+	TenantID             string    `json:"tenant_id"`
+	DevEUI               string    `json:"dev_eui,omitempty"`
+	SerialNumber         string    `json:"onu_sn,omitempty"`
+}
+
+func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.Services) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tenantID := r.PathValue("tenant_id")
 		if tenantID == "" {
@@ -92,6 +113,78 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models) http.Handler {
 		if err := c.Run(); err != nil {
 			serverErrorResponse(w, r, logger, err)
 			return
+		}
+
+		projectIDint, err := strconv.Atoi(projectID)
+		if err != nil {
+			serverErrorResponse(w, r, logger, err)
+			return
+		}
+
+		for _, node := range c.Result() {
+			networkComponentType := strings.ToUpper(node.Type.String())
+			status := strings.ToUpper(node.Status.String())
+
+			var devEUI string
+			if node.Type == correlation.SensorNode {
+				for _, sensor := range sensors {
+					if sensor.ID+1_000_000 != node.ID {
+						continue
+					}
+
+					devEUI = sensor.DevEUI
+					break
+				}
+			}
+
+			var serialNumber string
+			if node.Type == correlation.ONUNode {
+				for _, onu := range onus {
+					if onu.ID != node.ID {
+						continue
+					}
+
+					serialNumber = onu.Serial
+					break
+				}
+			}
+
+			msg := SNSMessage{
+				Timestamp:            time.Now(),
+				NetworkComponentType: networkComponentType,
+				NetworkComponentID:   strconv.Itoa(node.ID),
+				Description:          fmt.Sprintf("%s %s", status, networkComponentType),
+				Status:               status,
+				AlarmedProbability:   "0.0",
+				Last:                 false,
+				RootID:               0,
+				ProjectID:            projectIDint,
+				TenantID:             tenantID,
+				DevEUI:               devEUI,
+				SerialNumber:         serialNumber,
+			}
+
+			jsonBytes, err := json.Marshal(msg)
+			if err != nil {
+				logger.Warn("error marshaling sns message", "err", err.Error())
+				continue
+			}
+
+			var topicArn string
+			switch node.Type {
+			case correlation.ONUNode:
+				topicArn = "arn:aws:sns:us-east-1:000000000000:EH_ONU_EVENTS_TESTE"
+			case correlation.SensorNode:
+				topicArn = "arn:aws:sns:us-east-1:000000000000:EH_IOT_EVENTS_TESTE"
+			default:
+				topicArn = "arn:aws:sns:us-east-1:000000000000:EH_TOPOLOGIC_EVENTS_TESTE"
+			}
+
+			err = services.SNS.Publish(string(jsonBytes), topicArn)
+			if err != nil {
+				logger.Warn("error sending sns message", "err", err.Error())
+				continue
+			}
 		}
 
 		err = response.JSON(w, http.StatusOK, response.Envelope{"correlation": "done"})

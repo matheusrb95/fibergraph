@@ -13,7 +13,7 @@ func NewServer(logger *slog.Logger, models *data.Models, services *aws.Services)
 
 	mux.Handle("/example", HandleExample(logger, models, services))
 
-	mux.Handle("POST /correlation/{tenant_id}/{project_id}", HandleCorrelation(logger, models))
+	mux.Handle("POST /correlation/{tenant_id}/{project_id}", HandleCorrelation(logger, models, services))
 
 	return mux
 }

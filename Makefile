@@ -1,5 +1,5 @@
 LOCALSTACK_CONTAINER=fkcp-localstack
-SNS_TOPIC_NAME=TESTE
+SNS_TOPIC_NAMES=EH_IOT_EVENTS_TESTE EH_ONU_EVENTS_TESTE EH_TOPOLOGIC_EVENTS_TESTE
 SNS_ENDPOINT=http://localhost:4566
 AWS_REGION=us-east-1
 
@@ -14,7 +14,7 @@ draw:
 	done
 
 .PHONY: localstack
-localstack: start-localstack create-sns-topic
+localstack: start-localstack create-sns-topics
 
 .PHONY: start-localstack
 start-localstack:
@@ -23,6 +23,8 @@ start-localstack:
 		sleep 5; \
 	fi
 
-.PHONY: create-sns-topic
-create-sns-topic:
-	@aws --endpoint-url=$(SNS_ENDPOINT) sns create-topic --name $(SNS_TOPIC_NAME) --region $(AWS_REGION)
+.PHONY: create-sns-topics
+create-sns-topics:
+	@for topic in $(SNS_TOPIC_NAMES); do \
+		aws --endpoint-url=$(SNS_ENDPOINT) sns create-topic --name $$topic --region $(AWS_REGION); \
+	done
