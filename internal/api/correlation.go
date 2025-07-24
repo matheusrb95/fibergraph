@@ -36,6 +36,8 @@ type SNSMessage struct {
 	TenantID             string    `json:"tenant_id"`
 	DevEUI               string    `json:"dev_eui,omitempty"`
 	SerialNumber         string    `json:"onu_sn,omitempty"`
+	ONUID                string    `json:"onu_id,omitempty"`
+	ONUMessage           string    `json:"message,omitempty"`
 }
 
 func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.Services) http.Handler {
@@ -137,7 +139,7 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				}
 			}
 
-			var serialNumber string
+			var serialNumber, onuID, onuMessage string
 			if node.Type == correlation.ONUNode {
 				for _, onu := range onus {
 					if onu.ID != node.ID {
@@ -145,8 +147,23 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 					}
 
 					serialNumber = onu.Serial
+					onuID = strconv.Itoa(node.ID)
+					switch node.Status {
+					case correlation.Active:
+						onuMessage = "ONU activated"
+					case correlation.Alarmed:
+						onuMessage = "ONU deactivated"
+					}
 					break
 				}
+			}
+
+			var alarmedProbability string
+			switch node.Status {
+			case correlation.Alarmed:
+				alarmedProbability = "1.0"
+			default:
+				alarmedProbability = "0.0"
 			}
 
 			msg := SNSMessage{
@@ -155,13 +172,15 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				NetworkComponentID:   strconv.Itoa(node.ID),
 				Description:          fmt.Sprintf("%s %s", status, networkComponentType),
 				Status:               status,
-				AlarmedProbability:   "0.0",
+				AlarmedProbability:   alarmedProbability,
 				Last:                 false,
 				RootID:               0,
 				ProjectID:            projectIDint,
 				TenantID:             tenantID,
 				DevEUI:               devEUI,
 				SerialNumber:         serialNumber,
+				ONUID:                onuID,
+				ONUMessage:           onuMessage,
 			}
 
 			jsonBytes, err := json.Marshal(msg)
@@ -173,11 +192,13 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			var topic string
 			switch node.Type {
 			case correlation.ONUNode:
-				topic = "EH_ONU_EVENTS_TESTE"
+				topic = "EH_ONU_EVENTS"
 			case correlation.SensorNode:
-				topic = "EH_IOT_EVENTS_TESTE"
+				topic = "EH_IOT_EVENTS"
+			case correlation.FiberNode:
+				continue
 			default:
-				topic = "EH_TOPOLOGIC_EVENTS_TESTE"
+				topic = "EH_TOPOLOGIC_EVENTS"
 			}
 
 			err = services.SNS.Publish(string(jsonBytes), topic)
@@ -185,6 +206,7 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				logger.Warn("error sending sns message", "err", err.Error())
 				continue
 			}
+			logger.Info("sns message send.", "msg", string(jsonBytes))
 		}
 
 		err = response.JSON(w, http.StatusOK, response.Envelope{"correlation": "done"})

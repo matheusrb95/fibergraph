@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,7 +23,8 @@ type Correlation struct {
 	Segments       []*data.Segment
 	Components     []*data.Component
 
-	nodes map[int]*Node
+	nodes         map[int]*Node
+	nodesToUpdate []*Node
 }
 
 func New(
@@ -47,11 +49,12 @@ func New(
 		Segments:       segments,
 		Components:     components,
 		nodes:          make(map[int]*Node),
+		nodesToUpdate:  make([]*Node, 0),
 	}
 }
 
-func (c *Correlation) Result() map[int]*Node {
-	return c.nodes
+func (c *Correlation) Result() []*Node {
+	return c.nodesToUpdate
 }
 
 func (c *Correlation) Run() error {
@@ -73,6 +76,10 @@ func (c *Correlation) Run() error {
 	segmentNodes := c.BuildSegmentNodes()
 	rootNodes = c.BuildComponentNodes(segmentNodes)
 
+	if os.Getenv("DRAW_CORRELATION") != "true" {
+		return nil
+	}
+
 	if len(rootNodes) == 0 {
 		return errors.New("no nodes")
 	}
@@ -93,8 +100,12 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 	for _, connection := range c.Connections {
 		c.upsertConnectionMap(connection)
 
-		if connection.Type == "CO" {
+		switch connection.Type {
+		case "CO":
 			result = append(result, c.nodes[connection.ID])
+		case "Splitter":
+		case "ONU":
+			c.nodesToUpdate = append(c.nodesToUpdate, c.nodes[connection.ID])
 		}
 	}
 
@@ -219,6 +230,7 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 		}
 
 		result[segment.ID] = segmentNode
+		c.nodesToUpdate = append(c.nodesToUpdate, segmentNode)
 	}
 
 	return result
@@ -229,7 +241,18 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 
 	for _, component := range c.Components {
 		name := fmt.Sprintf("%d - %s", component.ID, component.Name)
-		componentNode := NewNode(component.ID, name, CTONode)
+		var nodeType NodeType
+		switch component.Type {
+		case "CO":
+			nodeType = CONode
+		case "CEO":
+			nodeType = CEONode
+		case "CTO":
+			nodeType = CTONode
+		case "ONU":
+			nodeType = ONUNode
+		}
+		componentNode := NewNode(component.ID, name, nodeType)
 
 		childrenIDs := []string{}
 		if component.ChildrenIDs != nil {
@@ -289,7 +312,9 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 
 		if component.ParentIDs == nil {
 			result = append(result, componentNode)
+			continue
 		}
+		c.nodesToUpdate = append(c.nodesToUpdate, componentNode)
 	}
 
 	return result
