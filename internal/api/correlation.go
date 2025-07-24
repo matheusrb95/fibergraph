@@ -170,17 +170,17 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				continue
 			}
 
-			var topicArn string
+			var topic string
 			switch node.Type {
 			case correlation.ONUNode:
-				topicArn = "arn:aws:sns:us-east-1:000000000000:EH_ONU_EVENTS_TESTE"
+				topic = "EH_ONU_EVENTS_TESTE"
 			case correlation.SensorNode:
-				topicArn = "arn:aws:sns:us-east-1:000000000000:EH_IOT_EVENTS_TESTE"
+				topic = "EH_IOT_EVENTS_TESTE"
 			default:
-				topicArn = "arn:aws:sns:us-east-1:000000000000:EH_TOPOLOGIC_EVENTS_TESTE"
+				topic = "EH_TOPOLOGIC_EVENTS_TESTE"
 			}
 
-			err = services.SNS.Publish(string(jsonBytes), topicArn)
+			err = services.SNS.Publish(string(jsonBytes), topic)
 			if err != nil {
 				logger.Warn("error sending sns message", "err", err.Error())
 				continue
