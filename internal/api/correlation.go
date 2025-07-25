@@ -35,7 +35,10 @@ type SNSMessage struct {
 	ProjectID            int       `json:"projectID"`
 	TenantID             string    `json:"tenant_id"`
 	DevEUI               string    `json:"dev_eui,omitempty"`
-	SerialNumber         string    `json:"onu_sn,omitempty"`
+	Cause                []string  `json:"cause,omitempty"`
+	OpticalPower         float32   `json:"opticalPower,omitempty"`
+	SerialNumber         string    `json:"serial_number"`
+	ONUSerialNumber      string    `json:"onu_sn,omitempty"`
 	ONUID                string    `json:"onu_id,omitempty"`
 	ONUMessage           string    `json:"message,omitempty"`
 }
@@ -128,6 +131,8 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			status := strings.ToUpper(node.Status.String())
 
 			var devEUI string
+			var opticalPower float32
+			var cause []string
 			if node.Type == correlation.SensorNode {
 				for _, sensor := range sensors {
 					if sensor.ID+1_000_000 != node.ID {
@@ -135,18 +140,20 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 					}
 
 					devEUI = sensor.DevEUI
+					opticalPower = -10.0
+					cause = []string{"OPTICAL_POWER_ALERT"}
 					break
 				}
 			}
 
-			var serialNumber, onuID, onuMessage string
+			var onuSerialNumber, onuID, onuMessage string
 			if node.Type == correlation.ONUNode {
 				for _, onu := range onus {
 					if onu.ID != node.ID {
 						continue
 					}
 
-					serialNumber = onu.Serial
+					onuSerialNumber = onu.Serial
 					onuID = strconv.Itoa(node.ID)
 					switch node.Status {
 					case correlation.Active:
@@ -178,7 +185,9 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				ProjectID:            projectIDint,
 				TenantID:             tenantID,
 				DevEUI:               devEUI,
-				SerialNumber:         serialNumber,
+				Cause:                cause,
+				OpticalPower:         opticalPower,
+				ONUSerialNumber:      onuSerialNumber,
 				ONUID:                onuID,
 				ONUMessage:           onuMessage,
 			}

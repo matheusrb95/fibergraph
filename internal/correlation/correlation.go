@@ -136,6 +136,8 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 		// }
 		node.Status = status
 		node.SetParents(fiberNode)
+
+		c.nodesToUpdate = append(c.nodesToUpdate, node)
 	}
 
 	for _, onu := range c.ONUs {
@@ -418,6 +420,10 @@ func alarmAllBelow(node *Node) {
 
 	for _, child := range node.Children {
 		alarmAllBelow(child)
+		if child.Type == SensorNode && child.Status == Active {
+			break
+		}
+
 		child.Status = Alarmed
 	}
 }
@@ -429,7 +435,7 @@ func probablyAlarmedAllAbove(node *Node) {
 
 	for _, parent := range node.Parents {
 		probablyAlarmedAllAbove(parent)
-		if parent.Status == Active {
+		if parent.Status != Undefined {
 			continue
 		}
 
