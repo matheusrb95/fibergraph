@@ -227,7 +227,16 @@ func (c *Correlation) DetermineComponentsStatus() {
 		}
 
 		name := fmt.Sprintf("%d - component", component.ID)
-		componentNode := NewNode(component.ID, name, ComponentNode)
+		var nodeType NodeType
+		switch component.Type {
+		case "CEO":
+			nodeType = CEONode
+		case "CTO":
+			nodeType = CTONode
+		case "CO":
+			nodeType = CONode
+		}
+		componentNode := NewNode(component.ID, name, nodeType)
 
 		var hasActive, hasAlarmed, hasProbablyAlarmed, hasUndefined bool
 
@@ -277,10 +286,12 @@ func (c *Correlation) updateConnectionMap(connection *data.Connection) {
 	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
 	var nodeType NodeType
 	switch connection.Type {
-	case "CO":
-	case "CTO":
 	case "CEO":
-		nodeType = ComponentNode
+		nodeType = CEONode
+	case "CTO":
+		nodeType = CTONode
+	case "CO":
+		nodeType = CONode
 	case "ONU":
 		nodeType = ONUNode
 	case "Fiber":
