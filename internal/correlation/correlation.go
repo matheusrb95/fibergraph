@@ -3,8 +3,6 @@ package correlation
 import (
 	"errors"
 	"fmt"
-	"log/slog"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,8 +21,8 @@ type Correlation struct {
 	Segments       []*data.Segment
 	Components     []*data.Component
 
-	nodes         map[int]*Node
-	nodesToUpdate []*Node
+	connectionNodes map[int]*Node
+	topologicNodes  []*Node
 }
 
 func New(
@@ -39,22 +37,22 @@ func New(
 	components []*data.Component,
 ) *Correlation {
 	return &Correlation{
-		Connections:    connections,
-		Sensors:        sensors,
-		ONUs:           onus,
-		ActiveSensors:  activeSensors,
-		AlarmedSensors: alarmedSensors,
-		ActiveONUs:     activeONUs,
-		AlarmedONUs:    alarmedONUs,
-		Segments:       segments,
-		Components:     components,
-		nodes:          make(map[int]*Node),
-		nodesToUpdate:  make([]*Node, 0),
+		Connections:     connections,
+		Sensors:         sensors,
+		ONUs:            onus,
+		ActiveSensors:   activeSensors,
+		AlarmedSensors:  alarmedSensors,
+		ActiveONUs:      activeONUs,
+		AlarmedONUs:     alarmedONUs,
+		Segments:        segments,
+		Components:      components,
+		connectionNodes: make(map[int]*Node),
+		topologicNodes:  make([]*Node, 0),
 	}
 }
 
 func (c *Correlation) Result() []*Node {
-	return c.nodesToUpdate
+	return c.topologicNodes
 }
 
 func (c *Correlation) Run() error {
@@ -73,23 +71,8 @@ func (c *Correlation) Run() error {
 		}
 	}
 
-	segmentNodes := c.BuildSegmentNodes()
-	rootNodes = c.BuildComponentNodes(segmentNodes)
-
-	if os.Getenv("DRAW_CORRELATION") != "true" {
-		return nil
-	}
-
-	if len(rootNodes) == 0 {
-		return errors.New("no nodes")
-	}
-
-	for _, rootNode := range rootNodes {
-		err := drawGraphs(rootNode)
-		if err != nil {
-			return err
-		}
-	}
+	c.DetermineSegmentsStatus()
+	c.DetermineComponentsStatus()
 
 	return nil
 }
@@ -98,19 +81,19 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 	result := make([]*Node, 0)
 
 	for _, connection := range c.Connections {
-		c.upsertConnectionMap(connection)
+		c.updateConnectionMap(connection)
 
 		switch connection.Type {
 		case "CO":
-			result = append(result, c.nodes[connection.ID])
+			result = append(result, c.connectionNodes[connection.ID])
 		case "Splitter":
 		case "ONU":
-			c.nodesToUpdate = append(c.nodesToUpdate, c.nodes[connection.ID])
+			c.topologicNodes = append(c.topologicNodes, c.connectionNodes[connection.ID])
 		}
 	}
 
 	for _, sensor := range c.Sensors {
-		fiberNode, ok := c.nodes[sensor.FiberID]
+		fiberNode, ok := c.connectionNodes[sensor.FiberID]
 		if !ok {
 			continue
 		}
@@ -137,11 +120,11 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 		node.Status = status
 		node.SetParents(fiberNode)
 
-		c.nodesToUpdate = append(c.nodesToUpdate, node)
+		c.topologicNodes = append(c.topologicNodes, node)
 	}
 
 	for _, onu := range c.ONUs {
-		onuNode, ok := c.nodes[onu.ID]
+		onuNode, ok := c.connectionNodes[onu.ID]
 		if !ok {
 			continue
 		}
@@ -174,12 +157,12 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 				continue
 			}
 
-			parentNode, ok := c.nodes[parentID]
+			parentNode, ok := c.connectionNodes[parentID]
 			if !ok {
 				continue
 			}
 
-			node := c.nodes[connection.ID]
+			node := c.connectionNodes[connection.ID]
 			node.SetParents(parentNode)
 		}
 	}
@@ -187,9 +170,7 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 	return result
 }
 
-func (c *Correlation) BuildSegmentNodes() map[int]*Node {
-	result := make(map[int]*Node)
-
+func (c *Correlation) DetermineSegmentsStatus() {
 	for _, segment := range c.Segments {
 		if segment.FiberIDs == nil {
 			continue
@@ -207,7 +188,7 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 				continue
 			}
 
-			node, ok := c.nodes[fiberID]
+			node, ok := c.connectionNodes[fiberID]
 			if !ok {
 				continue
 			}
@@ -235,69 +216,34 @@ func (c *Correlation) BuildSegmentNodes() map[int]*Node {
 			segmentNode.Status = Undefined
 		}
 
-		result[segment.ID] = segmentNode
-		c.nodesToUpdate = append(c.nodesToUpdate, segmentNode)
+		c.topologicNodes = append(c.topologicNodes, segmentNode)
 	}
-
-	return result
 }
 
-func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
-	result := make([]*Node, 0)
-
+func (c *Correlation) DetermineComponentsStatus() {
 	for _, component := range c.Components {
-		name := fmt.Sprintf("%d - %s", component.ID, component.Name)
-		var nodeType NodeType
-		switch component.Type {
-		case "CO":
-			nodeType = CONode
-		case "CEO":
-			nodeType = CEONode
-		case "CTO":
-			nodeType = CTONode
-		case "ONU":
-			nodeType = ONUNode
+		if component.FiberIDs == nil {
+			continue
 		}
-		componentNode := NewNode(component.ID, name, nodeType)
 
-		childrenIDs := []string{}
-		if component.ChildrenIDs != nil {
-			childrenIDs = strings.Split(*component.ChildrenIDs, ",")
-		}
-		for _, childID := range childrenIDs {
-			childID, err := strconv.Atoi(childID)
-			if err != nil {
-				continue
-			}
-
-			if _, ok := segmentNodes[childID]; !ok {
-				slog.Warn("segment node does not exist")
-				continue
-			}
-
-			componentNode.SetChildren(segmentNodes[childID])
-		}
+		name := fmt.Sprintf("%d - component", component.ID)
+		componentNode := NewNode(component.ID, name, ComponentNode)
 
 		var hasActive, hasAlarmed, hasProbablyAlarmed, hasUndefined bool
 
-		parentIDs := []string{}
-		if component.ParentIDs != nil {
-			parentIDs = strings.Split(*component.ParentIDs, ",")
-		}
-		for _, parentID := range parentIDs {
-			parentID, err := strconv.Atoi(parentID)
+		fiberIDs := strings.SplitSeq(*component.FiberIDs, ",")
+		for fiberID := range fiberIDs {
+			fiberID, err := strconv.Atoi(fiberID)
 			if err != nil {
 				continue
 			}
 
-			if _, ok := segmentNodes[parentID]; !ok {
-				slog.Warn("segment node does not exist")
+			node, ok := c.connectionNodes[fiberID]
+			if !ok {
 				continue
 			}
 
-			componentNode.SetParents(segmentNodes[parentID])
-
-			switch segmentNodes[parentID].Status {
+			switch node.Status {
 			case Active:
 				hasActive = true
 			case Alarmed:
@@ -319,19 +265,12 @@ func (c *Correlation) BuildComponentNodes(segmentNodes map[int]*Node) []*Node {
 		case hasUndefined:
 			componentNode.Status = Undefined
 		}
-
-		if component.ParentIDs == nil {
-			result = append(result, componentNode)
-			continue
-		}
-		c.nodesToUpdate = append(c.nodesToUpdate, componentNode)
+		c.topologicNodes = append(c.topologicNodes, componentNode)
 	}
-
-	return result
 }
 
-func (c *Correlation) upsertConnectionMap(connection *data.Connection) {
-	if _, ok := c.nodes[connection.ID]; ok {
+func (c *Correlation) updateConnectionMap(connection *data.Connection) {
+	if _, ok := c.connectionNodes[connection.ID]; ok {
 		return
 	}
 
@@ -339,9 +278,9 @@ func (c *Correlation) upsertConnectionMap(connection *data.Connection) {
 	var nodeType NodeType
 	switch connection.Type {
 	case "CO":
-		nodeType = CONode
 	case "CTO":
-		nodeType = CTONode
+	case "CEO":
+		nodeType = ComponentNode
 	case "ONU":
 		nodeType = ONUNode
 	case "Fiber":
@@ -351,7 +290,7 @@ func (c *Correlation) upsertConnectionMap(connection *data.Connection) {
 	case "Sensor":
 		nodeType = SensorNode
 	}
-	c.nodes[connection.ID] = NewNode(connection.ID, name, nodeType)
+	c.connectionNodes[connection.ID] = NewNode(connection.ID, name, nodeType)
 }
 
 func propagateSensorStatus(node *Node) {

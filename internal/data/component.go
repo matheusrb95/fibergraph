@@ -8,11 +8,8 @@ import (
 )
 
 type Component struct {
-	ID          int
-	Name        string
-	ParentIDs   *string
-	ChildrenIDs *string
-	Type        string
+	ID       int
+	FiberIDs *string
 }
 
 type ComponentModel struct {
@@ -50,30 +47,17 @@ func (m *ComponentModel) GetAll(tenantID, projectID string) ([]*Component, error
 func getComponents(ctx context.Context, tx *sql.Tx, projectID string) ([]*Component, error) {
 	query := `
 		SELECT 
-			csc.csc_network_component_id,
-			nc.nc_name,
-			GROUP_CONCAT(CASE WHEN csc.csc_segment_point = 'END' THEN csc.csc_segment_id ELSE NULL END),
-			GROUP_CONCAT(CASE WHEN csc.csc_segment_point = 'START' THEN csc.csc_segment_id ELSE NULL END),
-			CASE
-				WHEN co.co_network_component_id IS NOT NULL THEN 'CO'
-				WHEN cto.cto_network_component_id IS NOT NULL THEN 'CTO'
-				WHEN ceo.ceo_network_component_id IS NOT NULL THEN 'CEO'
-				WHEN onu.onu_network_component_id IS NOT NULL THEN 'ONU'
-			END
+			p.port_splice_closure_network_component_id,
+			GROUP_CONCAT(p.port_network_component_id)
 		FROM
-			component_segment_connection csc
-			LEFT OUTER JOIN network_component nc ON nc.nc_id = csc.csc_network_component_id
-			LEFT OUTER JOIN project_network_component pnc ON pnc_network_component_id = nc.nc_id
-			
-			LEFT OUTER JOIN co ON co.co_network_component_id = csc.csc_network_component_id
-			LEFT OUTER JOIN cto ON cto.cto_network_component_id = csc.csc_network_component_id
-			LEFT OUTER JOIN ceo ON ceo.ceo_network_component_id = csc.csc_network_component_id
-			LEFT OUTER JOIN onu ON onu.onu_network_component_id = csc.csc_network_component_id
+			port p
+			LEFT OUTER JOIN network_component nc ON nc.nc_id = p.port_splice_closure_network_component_id
+			LEFT OUTER JOIN project_network_component pnc ON pnc.pnc_network_component_id = nc.nc_id
 		WHERE
-			csc.csc_network_component_id IS NOT NULL
+			p.optical_signal_direction = 'TX'
 			AND pnc.pnc_project_id = ?
 		GROUP BY
-			csc.csc_network_component_id, nc.nc_name;
+			p.port_splice_closure_network_component_id;
 	`
 
 	rows, err := tx.QueryContext(ctx, query, projectID)
@@ -87,10 +71,7 @@ func getComponents(ctx context.Context, tx *sql.Tx, projectID string) ([]*Compon
 		var component Component
 		err := rows.Scan(
 			&component.ID,
-			&component.Name,
-			&component.ParentIDs,
-			&component.ChildrenIDs,
-			&component.Type,
+			&component.FiberIDs,
 		)
 		if err != nil {
 			return nil, err

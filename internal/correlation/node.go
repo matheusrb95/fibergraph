@@ -6,12 +6,10 @@ type (
 )
 
 const (
-	CTONode NodeType = iota
-	CEONode
-	CONode
-	FiberNode
+	FiberNode NodeType = iota
 	SplitterNode
 	SegmentNode
+	ComponentNode
 	SensorNode
 	ONUNode
 )
@@ -24,14 +22,12 @@ const (
 )
 
 var nodeName = map[NodeType]string{
-	CTONode:      "CTO",
-	CEONode:      "CEO",
-	CONode:       "CO",
-	FiberNode:    "Fiber",
-	SplitterNode: "Splitter",
-	SegmentNode:  "Segment",
-	SensorNode:   "Sensor",
-	ONUNode:      "ONU",
+	FiberNode:     "Fiber",
+	SplitterNode:  "Splitter",
+	SegmentNode:   "Segment",
+	ComponentNode: "Component",
+	SensorNode:    "Sensor",
+	ONUNode:       "ONU",
 }
 
 var statusName = map[Status]string{
