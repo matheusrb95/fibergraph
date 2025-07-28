@@ -44,9 +44,14 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("open db. %w", err)
 	}
 
+	services := aws.NewServices(cfg)
+	err = services.SNS.Ping()
+	if err != nil {
+		return fmt.Errorf("sns client not working. %w", err)
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	models := data.NewModels(db)
-	services := aws.NewServices(cfg)
 	srv := api.NewServer(logger, models, services)
 
 	httpServer := &http.Server{

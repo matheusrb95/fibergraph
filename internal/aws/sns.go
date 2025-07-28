@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -12,6 +13,14 @@ import (
 
 type SNSService struct {
 	Client *sns.Client
+}
+
+func (s *SNSService) Ping() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := s.Client.ListTopics(ctx, &sns.ListTopicsInput{})
+	return err
 }
 
 func (s *SNSService) Publish(msg, topic string) error {
