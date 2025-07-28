@@ -30,6 +30,7 @@ type SNSMessage struct {
 	Description          string    `json:"description"`
 	Status               string    `json:"status"`
 	AlarmedProbability   string    `json:"alarmedProbability"`
+	AlarmedBox           int       `json:"alarmed_box"`
 	Last                 bool      `json:"last"`
 	RootID               int       `json:"rootID"`
 	ProjectID            int       `json:"projectID"`
@@ -166,11 +167,14 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			}
 
 			var alarmedProbability string
+			var alarmedBox int
 			switch node.Status {
 			case correlation.Alarmed:
 				alarmedProbability = "1.0"
+				alarmedBox = 1
 			default:
 				alarmedProbability = "0.0"
+				alarmedBox = 0
 			}
 
 			msg := SNSMessage{
@@ -180,6 +184,7 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				Description:          fmt.Sprintf("%s %s", status, networkComponentType),
 				Status:               status,
 				AlarmedProbability:   alarmedProbability,
+				AlarmedBox:           alarmedBox,
 				Last:                 false,
 				RootID:               0,
 				ProjectID:            projectIDint,
