@@ -54,6 +54,7 @@ func getComponents(ctx context.Context, tx *sql.Tx, projectID string) ([]*Compon
 				WHEN ceo.ceo_network_component_id IS NOT NULL THEN 'CEO'
 				WHEN cto.cto_network_component_id IS NOT NULL THEN 'CTO'
 				WHEN co.co_network_component_id IS NOT NULL THEN 'CO'
+				WHEN onu.onu_network_component_id IS NOT NULL THEN 'ONU'
 			END
 		FROM
 			port p
@@ -63,6 +64,7 @@ func getComponents(ctx context.Context, tx *sql.Tx, projectID string) ([]*Compon
 			LEFT OUTER JOIN ceo ON ceo.ceo_network_component_id = nc.nc_id
 			LEFT OUTER JOIN cto ON cto.cto_network_component_id = nc.nc_id
 			LEFT OUTER JOIN co ON co.co_network_component_id = nc.nc_id
+			LEFT OUTER JOIN onu ON onu.onu_network_component_id = nc.nc_id
 		WHERE
 			p.optical_signal_direction = 'TX'
 			AND pnc.pnc_project_id = ?
