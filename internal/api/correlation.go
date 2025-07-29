@@ -17,10 +17,11 @@ import (
 )
 
 type EquipmentStatus struct {
-	ActiveSensors  []string `json:"active_sensors"`
-	AlarmedSensors []string `json:"alarmed_sensors"`
-	ActiveONUs     []string `json:"active_onus"`
-	AlarmedONUs    []string `json:"alarmed_onus"`
+	ActiveSensors   []string `json:"active_sensors"`
+	AlarmedSensors  []string `json:"alarmed_sensors"`
+	InactiveSensors []string `json:"inactive_sensors"`
+	ActiveONUs      []string `json:"active_onus"`
+	AlarmedONUs     []string `json:"alarmed_onus"`
 }
 
 type SNSMessage struct {
@@ -111,6 +112,7 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			onus,
 			equipmentStatus.ActiveSensors,
 			equipmentStatus.AlarmedSensors,
+			equipmentStatus.InactiveSensors,
 			equipmentStatus.ActiveONUs,
 			equipmentStatus.AlarmedONUs,
 			segments,
@@ -127,101 +129,103 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			return
 		}
 
-		for _, node := range c.Result() {
-			networkComponentType := strings.ToUpper(node.Type.String())
-			status := strings.ToUpper(node.Status.String())
+		go func() {
+			for _, node := range c.Result() {
+				networkComponentType := strings.ToUpper(node.Type.String())
+				status := strings.ToUpper(node.Status.String())
 
-			var devEUI string
-			var opticalPower float32
-			var cause []string
-			if node.Type == correlation.SensorNode {
-				for _, sensor := range sensors {
-					if sensor.ID+1_000_000 != node.ID {
-						continue
+				var devEUI string
+				var opticalPower float32
+				var cause []string
+				if node.Type == correlation.SensorNode {
+					for _, sensor := range sensors {
+						if sensor.ID+1_000_000 != node.ID {
+							continue
+						}
+
+						devEUI = sensor.DevEUI
+						opticalPower = -10.0
+						cause = []string{"OPTICAL_POWER_ALERT"}
+						break
 					}
-
-					devEUI = sensor.DevEUI
-					opticalPower = -10.0
-					cause = []string{"OPTICAL_POWER_ALERT"}
-					break
 				}
-			}
 
-			var onuSerialNumber, onuID, onuMessage string
-			if node.Type == correlation.ONUNode {
-				for _, onu := range onus {
-					if onu.ID != node.ID {
-						continue
-					}
+				var onuSerialNumber, onuID, onuMessage string
+				if node.Type == correlation.ONUNode {
+					for _, onu := range onus {
+						if onu.ID != node.ID {
+							continue
+						}
 
-					onuSerialNumber = onu.Serial
-					onuID = strconv.Itoa(node.ID)
-					switch node.Status {
-					case correlation.Active:
-						onuMessage = "ONU activated"
-					case correlation.Alarmed:
-						onuMessage = "ONU deactivated"
+						onuSerialNumber = onu.Serial
+						onuID = strconv.Itoa(node.ID)
+						switch node.Status {
+						case correlation.Active:
+							onuMessage = "ONU activated"
+						case correlation.Alarmed:
+							onuMessage = "ONU deactivated"
+						}
+						break
 					}
-					break
 				}
-			}
 
-			var alarmedProbability string
-			var alarmedBox int
-			switch node.Status {
-			case correlation.Alarmed:
-				alarmedProbability = "1.0"
-				alarmedBox = 1
-			default:
-				alarmedProbability = "0.0"
-				alarmedBox = 0
-			}
+				var alarmedProbability string
+				var alarmedBox int
+				switch node.Status {
+				case correlation.Alarmed:
+					alarmedProbability = "1.0"
+					alarmedBox = 1
+				default:
+					alarmedProbability = "0.0"
+					alarmedBox = 0
+				}
 
-			msg := SNSMessage{
-				Timestamp:            time.Now(),
-				NetworkComponentType: networkComponentType,
-				NetworkComponentID:   strconv.Itoa(node.ID),
-				Description:          fmt.Sprintf("%s %s", status, networkComponentType),
-				Status:               status,
-				AlarmedProbability:   alarmedProbability,
-				AlarmedBox:           alarmedBox,
-				Last:                 false,
-				RootID:               0,
-				ProjectID:            projectIDint,
-				TenantID:             tenantID,
-				DevEUI:               devEUI,
-				Cause:                cause,
-				OpticalPower:         opticalPower,
-				ONUSerialNumber:      onuSerialNumber,
-				ONUID:                onuID,
-				ONUMessage:           onuMessage,
-			}
+				msg := SNSMessage{
+					Timestamp:            time.Now(),
+					NetworkComponentType: networkComponentType,
+					NetworkComponentID:   strconv.Itoa(node.ID),
+					Description:          fmt.Sprintf("%s %s", status, networkComponentType),
+					Status:               status,
+					AlarmedProbability:   alarmedProbability,
+					AlarmedBox:           alarmedBox,
+					Last:                 false,
+					RootID:               0,
+					ProjectID:            projectIDint,
+					TenantID:             tenantID,
+					DevEUI:               devEUI,
+					Cause:                cause,
+					OpticalPower:         opticalPower,
+					ONUSerialNumber:      onuSerialNumber,
+					ONUID:                onuID,
+					ONUMessage:           onuMessage,
+				}
 
-			jsonBytes, err := json.Marshal(msg)
-			if err != nil {
-				logger.Warn("error marshaling sns message", "err", err.Error())
-				continue
-			}
+				jsonBytes, err := json.Marshal(msg)
+				if err != nil {
+					logger.Warn("error marshaling sns message", "err", err.Error())
+					continue
+				}
 
-			var topic string
-			switch node.Type {
-			case correlation.ONUNode:
-				topic = "EH_ONU_EVENTS"
-			case correlation.SensorNode:
-				topic = "EH_IOT_EVENTS"
-			case correlation.FiberNode:
-				continue
-			default:
-				topic = "EH_TOPOLOGIC_EVENTS"
-			}
+				var topic string
+				switch node.Type {
+				case correlation.ONUNode:
+					topic = "EH_ONU_EVENTS"
+				case correlation.SensorNode:
+					topic = "EH_IOT_EVENTS"
+				case correlation.FiberNode:
+					continue
+				default:
+					topic = "EH_TOPOLOGIC_EVENTS"
+				}
 
-			err = services.SNS.Publish(string(jsonBytes), topic)
-			if err != nil {
-				logger.Warn("error sending sns message", "err", err.Error())
-				continue
+				err = services.SNS.Publish(string(jsonBytes), topic)
+				if err != nil {
+					logger.Warn("error sending sns message", "err", err.Error())
+					continue
+				}
+				logger.Info("sns message send.", "msg", string(jsonBytes))
 			}
-			logger.Info("sns message send.", "msg", string(jsonBytes))
-		}
+		}()
 
 		err = response.JSON(w, http.StatusOK, response.Envelope{"correlation": "done"})
 		if err != nil {

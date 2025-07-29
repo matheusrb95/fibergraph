@@ -11,15 +11,16 @@ import (
 )
 
 type Correlation struct {
-	Connections    []*data.Connection
-	Sensors        []*data.Sensor
-	ONUs           []*data.ONU
-	ActiveSensors  []string
-	AlarmedSensors []string
-	ActiveONUs     []string
-	AlarmedONUs    []string
-	Segments       []*data.Segment
-	Components     []*data.Component
+	Connections     []*data.Connection
+	Sensors         []*data.Sensor
+	ONUs            []*data.ONU
+	ActiveSensors   []string
+	AlarmedSensors  []string
+	InactiveSensors []string
+	ActiveONUs      []string
+	AlarmedONUs     []string
+	Segments        []*data.Segment
+	Components      []*data.Component
 
 	connectionNodes map[int]*Node
 	topologicNodes  []*Node
@@ -31,6 +32,7 @@ func New(
 	onus []*data.ONU,
 	activeSensors []string,
 	alarmedSensors []string,
+	inactiveSensors []string,
 	activeONUs []string,
 	alarmedONUs []string,
 	segments []*data.Segment,
@@ -42,6 +44,7 @@ func New(
 		ONUs:            onus,
 		ActiveSensors:   activeSensors,
 		AlarmedSensors:  alarmedSensors,
+		InactiveSensors: inactiveSensors,
 		ActiveONUs:      activeONUs,
 		AlarmedONUs:     alarmedONUs,
 		Segments:        segments,
@@ -102,21 +105,22 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 		node := NewNode(sensor.ID+1_000_000, name, SensorNode)
 		var status Status
 
+		switch sensor.Status {
+		case "ACTIVE":
+			status = Active
+		case "ALARMED":
+			status = Alarmed
+		default:
+			status = Undefined
+		}
+
 		if slices.Contains(c.AlarmedSensors, sensor.DevEUI) {
 			status = Alarmed
 		} else if slices.Contains(c.ActiveSensors, sensor.DevEUI) {
 			status = Active
-		} else {
+		} else if slices.Contains(c.InactiveSensors, sensor.DevEUI) {
 			status = Undefined
 		}
-		// switch sensor.Status {
-		// case "ACTIVE":
-		// status = Active
-		// case "ALARMED":
-		// status = Alarmed
-		// default:
-		// status = Undefined
-		// }
 		node.Status = status
 		node.SetParents(fiberNode)
 
