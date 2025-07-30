@@ -21,6 +21,7 @@ const (
 	Alarmed
 	ProbablyAlarmed
 	Undefined
+	Inconsistent
 )
 
 var nodeName = map[NodeType]string{
@@ -39,6 +40,7 @@ var statusName = map[Status]string{
 	Alarmed:         "Alarmed",
 	ProbablyAlarmed: "Probably_Alarmed",
 	Undefined:       "Undefined",
+	Inconsistent:    "Inconsistent",
 }
 
 func (nt NodeType) String() string {

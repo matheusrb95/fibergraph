@@ -3,6 +3,7 @@ package correlation
 import (
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -59,28 +60,63 @@ func (c *Correlation) Result() []*Node {
 }
 
 func (c *Correlation) Run() error {
-	rootNodes := c.BuildNetworkWithConnection()
+	rootNodes := c.buildNetworkWithConnection()
 
 	if len(rootNodes) == 0 {
 		return errors.New("no nodes")
 	}
 
 	for _, rootNode := range rootNodes {
+		inconsistentSensors := make([]*Node, 0)
+		checkInconsistentSensor(rootNode, &inconsistentSensors)
+		if len(inconsistentSensors) != 0 {
+			c.determineInconsistentSensor(inconsistentSensors[1], inconsistentSensors[0])
+		}
+
 		propagateSensorStatus(rootNode)
 		propagateONUStatus(rootNode)
-		err := drawGraphs(rootNode)
-		if err != nil {
-			return err
+
+		if os.Getenv("DRAW_CORRELATION") == "true" {
+			err := drawGraphs(rootNode)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	c.DetermineSegmentsStatus()
-	c.DetermineComponentsStatus()
+	c.determineSegmentsStatus()
+	c.determineComponentsStatus()
 
 	return nil
 }
 
-func (c *Correlation) BuildNetworkWithConnection() []*Node {
+func (c *Correlation) determineInconsistentSensor(alarmedNode, activeNode *Node) {
+	alarmedSensor := findSensorByNodeID(c.Sensors, alarmedNode.ID)
+	activeSensor := findSensorByNodeID(c.Sensors, activeNode.ID)
+
+	alarmedInList := slices.Contains(c.AlarmedSensors, alarmedSensor.DevEUI)
+	activeInList := slices.Contains(c.ActiveSensors, activeSensor.DevEUI)
+
+	switch {
+	case activeInList && !alarmedInList:
+		alarmedNode.Status = Inconsistent
+	case alarmedInList && !activeInList:
+		activeNode.Status = Inconsistent
+	default:
+		alarmedNode.Status = Inconsistent
+	}
+}
+
+func findSensorByNodeID(sensors []*data.Sensor, nodeID int) *data.Sensor {
+	for _, sensor := range sensors {
+		if sensor.ID+1_000_000 == nodeID {
+			return sensor
+		}
+	}
+	return nil
+}
+
+func (c *Correlation) buildNetworkWithConnection() []*Node {
 	result := make([]*Node, 0)
 
 	for _, connection := range c.Connections {
@@ -174,7 +210,7 @@ func (c *Correlation) BuildNetworkWithConnection() []*Node {
 	return result
 }
 
-func (c *Correlation) DetermineSegmentsStatus() {
+func (c *Correlation) determineSegmentsStatus() {
 	for _, segment := range c.Segments {
 		if segment.FiberIDs == nil {
 			continue
@@ -224,7 +260,7 @@ func (c *Correlation) DetermineSegmentsStatus() {
 	}
 }
 
-func (c *Correlation) DetermineComponentsStatus() {
+func (c *Correlation) determineComponentsStatus() {
 	for _, component := range c.Components {
 		if component.FiberIDs == nil {
 			continue
@@ -308,6 +344,42 @@ func (c *Correlation) updateConnectionMap(connection *data.Connection) {
 	c.connectionNodes[connection.ID] = NewNode(connection.ID, name, nodeType)
 }
 
+func checkInconsistentSensor(node *Node, result *[]*Node) {
+	if node.Children == nil {
+		return
+	}
+
+	for _, child := range node.Children {
+		if child.Type == SensorNode && child.Status == Alarmed {
+			if hasSensorActiveBelow(node, result) {
+				*result = append(*result, child)
+			}
+		}
+
+		checkInconsistentSensor(child, result)
+	}
+}
+
+func hasSensorActiveBelow(node *Node, result *[]*Node) bool {
+	for _, child := range node.Children {
+		if child.Type == SensorNode {
+			switch child.Status {
+			case Active:
+				*result = append(*result, child)
+				return true
+			default:
+				continue
+			}
+		}
+
+		if hasSensorActiveBelow(child, result) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func propagateSensorStatus(node *Node) {
 	if node.Children == nil {
 		return
@@ -374,8 +446,8 @@ func alarmAllBelow(node *Node) {
 
 	for _, child := range node.Children {
 		alarmAllBelow(child)
-		if child.Type == SensorNode && child.Status == Active {
-			break
+		if child.Type == SensorNode {
+			continue
 		}
 
 		child.Status = Alarmed

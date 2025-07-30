@@ -39,6 +39,8 @@ func walk(g graph.Graph[int, int], n *Node) {
 		attr = graph.VertexAttribute("color", "red")
 	case ProbablyAlarmed:
 		attr = graph.VertexAttribute("color", "orange")
+	case Inconsistent:
+		attr = graph.VertexAttribute("color", "pink")
 	case Active:
 		attr = graph.VertexAttribute("color", "green")
 	default:
@@ -56,6 +58,8 @@ func walk(g graph.Graph[int, int], n *Node) {
 			attr = graph.VertexAttribute("color", "orange")
 		case Active:
 			attr = graph.VertexAttribute("color", "green")
+		case Inconsistent:
+			attr = graph.VertexAttribute("color", "pink")
 		default:
 			attr = graph.VertexAttribute("color", "black")
 		}
