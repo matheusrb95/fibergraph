@@ -12,7 +12,6 @@ var ErrRecordNotFound = errors.New("record not found")
 type Models struct {
 	Component  ComponentModel
 	Connection ConnectionModel
-	Segment    SegmentModel
 	Sensor     SensorModel
 	ONU        ONUModel
 }
@@ -21,7 +20,6 @@ func NewModels(db *sql.DB) *Models {
 	return &Models{
 		Component:  ComponentModel{DB: db},
 		Connection: ConnectionModel{DB: db},
-		Segment:    SegmentModel{DB: db},
 		Sensor:     SensorModel{DB: db},
 		ONU:        ONUModel{DB: db},
 	}

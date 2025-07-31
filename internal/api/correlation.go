@@ -84,12 +84,6 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			return
 		}
 
-		segments, err := models.Segment.GetAll(tenantID, projectID)
-		if err != nil {
-			serverErrorResponse(w, r, logger, err)
-			return
-		}
-
 		components, err := models.Component.GetAll(tenantID, projectID)
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
@@ -102,7 +96,6 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			"connections_len", len(connections),
 			"sensors_len", len(sensors),
 			"onus_len", len(onus),
-			"segments_len", len(segments),
 			"components_len", len(components),
 		)
 
@@ -115,7 +108,6 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			equipmentStatus.InactiveSensors,
 			equipmentStatus.ActiveONUs,
 			equipmentStatus.AlarmedONUs,
-			segments,
 			components,
 		)
 		if err := c.Run(); err != nil {

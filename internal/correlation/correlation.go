@@ -19,7 +19,6 @@ type Correlation struct {
 	InactiveSensors []string
 	ActiveONUs      []string
 	AlarmedONUs     []string
-	Segments        []*data.Segment
 	Components      []*data.Component
 
 	connectionNodes map[string]*Node
@@ -35,7 +34,6 @@ func New(
 	inactiveSensors []string,
 	activeONUs []string,
 	alarmedONUs []string,
-	segments []*data.Segment,
 	components []*data.Component,
 ) *Correlation {
 	return &Correlation{
@@ -47,7 +45,6 @@ func New(
 		InactiveSensors: inactiveSensors,
 		ActiveONUs:      activeONUs,
 		AlarmedONUs:     alarmedONUs,
-		Segments:        segments,
 		Components:      components,
 		connectionNodes: make(map[string]*Node),
 		topologicNodes:  make([]*Node, 0),
@@ -83,7 +80,6 @@ func (c *Correlation) Run() error {
 		}
 	}
 
-	c.determineSegmentsStatus()
 	c.determineComponentsStatus()
 
 	return nil
@@ -199,51 +195,6 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 	return result
 }
 
-func (c *Correlation) determineSegmentsStatus() {
-	for _, segment := range c.Segments {
-		if segment.FiberIDs == nil {
-			continue
-		}
-
-		name := fmt.Sprintf("%s - segment", segment.ID)
-		segmentNode := NewNode(segment.ID, name, SegmentNode)
-
-		var hasActive, hasAlarmed, hasProbablyAlarmed, hasUndefined bool
-
-		fiberIDs := strings.SplitSeq(*segment.FiberIDs, ",")
-		for fiberID := range fiberIDs {
-			node, ok := c.connectionNodes[fiberID]
-			if !ok {
-				continue
-			}
-
-			switch node.Status {
-			case Active:
-				hasActive = true
-			case Alarmed:
-				hasAlarmed = true
-			case ProbablyAlarmed:
-				hasProbablyAlarmed = true
-			case Undefined:
-				hasUndefined = true
-			}
-		}
-
-		switch {
-		case hasActive:
-			segmentNode.Status = Active
-		case hasAlarmed:
-			segmentNode.Status = Alarmed
-		case hasProbablyAlarmed:
-			segmentNode.Status = ProbablyAlarmed
-		case hasUndefined:
-			segmentNode.Status = Undefined
-		}
-
-		c.topologicNodes = append(c.topologicNodes, segmentNode)
-	}
-}
-
 func (c *Correlation) determineComponentsStatus() {
 	for _, component := range c.Components {
 		if component.FiberIDs == nil {
@@ -259,6 +210,8 @@ func (c *Correlation) determineComponentsStatus() {
 			nodeType = CTONode
 		case "CO":
 			nodeType = CONode
+		case "Segment":
+			nodeType = SegmentNode
 		}
 		componentNode := NewNode(component.ID, name, nodeType)
 
