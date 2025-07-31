@@ -8,10 +8,9 @@ import (
 )
 
 type Sensor struct {
-	ID      int
 	DevEUI  string
 	Status  string
-	FiberID int
+	FiberID string
 }
 
 type SensorModel struct {
@@ -49,7 +48,6 @@ func (m *SensorModel) GetAll(tenantID, projectID string) ([]*Sensor, error) {
 func getSensors(ctx context.Context, tx *sql.Tx, projectID string) ([]*Sensor, error) {
 	query := `
 		SELECT 
-			s.sensor_id,
 			s.sensor_deveui,
 			s.sensor_operational_status,
 			p.port_network_component_id
@@ -72,7 +70,6 @@ func getSensors(ctx context.Context, tx *sql.Tx, projectID string) ([]*Sensor, e
 	for rows.Next() {
 		var sensor Sensor
 		err := rows.Scan(
-			&sensor.ID,
 			&sensor.DevEUI,
 			&sensor.Status,
 			&sensor.FiberID,

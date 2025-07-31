@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/matheusrb95/fibergraph/internal/data"
@@ -23,7 +22,7 @@ type Correlation struct {
 	Segments        []*data.Segment
 	Components      []*data.Component
 
-	connectionNodes map[int]*Node
+	connectionNodes map[string]*Node
 	topologicNodes  []*Node
 }
 
@@ -50,7 +49,7 @@ func New(
 		AlarmedONUs:     alarmedONUs,
 		Segments:        segments,
 		Components:      components,
-		connectionNodes: make(map[int]*Node),
+		connectionNodes: make(map[string]*Node),
 		topologicNodes:  make([]*Node, 0),
 	}
 }
@@ -91,11 +90,8 @@ func (c *Correlation) Run() error {
 }
 
 func (c *Correlation) determineInconsistentSensor(alarmedNode, activeNode *Node) {
-	alarmedSensor := findSensorByNodeID(c.Sensors, alarmedNode.ID)
-	activeSensor := findSensorByNodeID(c.Sensors, activeNode.ID)
-
-	alarmedInList := slices.Contains(c.AlarmedSensors, alarmedSensor.DevEUI)
-	activeInList := slices.Contains(c.ActiveSensors, activeSensor.DevEUI)
+	alarmedInList := slices.Contains(c.AlarmedSensors, alarmedNode.ID)
+	activeInList := slices.Contains(c.ActiveSensors, activeNode.ID)
 
 	switch {
 	case activeInList && !alarmedInList:
@@ -105,15 +101,6 @@ func (c *Correlation) determineInconsistentSensor(alarmedNode, activeNode *Node)
 	default:
 		alarmedNode.Status = Inconsistent
 	}
-}
-
-func findSensorByNodeID(sensors []*data.Sensor, nodeID int) *data.Sensor {
-	for _, sensor := range sensors {
-		if sensor.ID+1_000_000 == nodeID {
-			return sensor
-		}
-	}
-	return nil
 }
 
 func (c *Correlation) buildNetworkWithConnection() []*Node {
@@ -126,7 +113,6 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 		case "CO":
 			result = append(result, c.connectionNodes[connection.ID])
 		case "Splitter":
-		case "ONU":
 			c.topologicNodes = append(c.topologicNodes, c.connectionNodes[connection.ID])
 		}
 	}
@@ -137,10 +123,10 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 			continue
 		}
 
-		name := fmt.Sprintf("%d - SPD", sensor.ID)
-		node := NewNode(sensor.ID+1_000_000, name, SensorNode)
-		var status Status
+		name := fmt.Sprintf("%s - SPD", sensor.DevEUI)
+		node := NewNode(sensor.DevEUI, name, SensorNode)
 
+		var status Status
 		switch sensor.Status {
 		case "ACTIVE":
 			status = Active
@@ -156,7 +142,10 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 			status = Active
 		} else if slices.Contains(c.InactiveSensors, sensor.DevEUI) {
 			status = Undefined
+		} else {
+			status = Undefined
 		}
+
 		node.Status = status
 		node.SetParents(fiberNode)
 
@@ -164,22 +153,27 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 	}
 
 	for _, onu := range c.ONUs {
-		onuNode, ok := c.connectionNodes[onu.ID]
+		fiberNode, ok := c.connectionNodes[onu.FiberID]
 		if !ok {
 			continue
 		}
 
+		name := fmt.Sprintf("%s - ONU", onu.SerialNumber)
+		node := NewNode(onu.SerialNumber, name, ONUNode)
+
 		var status Status
-		if slices.Contains(c.AlarmedONUs, onu.Serial) {
+		if slices.Contains(c.AlarmedONUs, onu.SerialNumber) {
 			status = Alarmed
-		} else if slices.Contains(c.ActiveONUs, onu.Serial) {
+		} else if slices.Contains(c.ActiveONUs, onu.SerialNumber) {
 			status = Active
 		} else {
 			status = Undefined
 		}
 
-		onuNode.Type = ONUNode
-		onuNode.Status = status
+		node.Status = status
+		node.SetParents(fiberNode)
+
+		c.topologicNodes = append(c.topologicNodes, node)
 	}
 
 	for _, connection := range c.Connections {
@@ -192,11 +186,6 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 			parentIDs = strings.Split(*connection.ParentIDs, ",")
 		}
 		for _, parentID := range parentIDs {
-			parentID, err := strconv.Atoi(parentID)
-			if err != nil {
-				continue
-			}
-
 			parentNode, ok := c.connectionNodes[parentID]
 			if !ok {
 				continue
@@ -216,18 +205,13 @@ func (c *Correlation) determineSegmentsStatus() {
 			continue
 		}
 
-		name := fmt.Sprintf("%d - segment", segment.ID)
+		name := fmt.Sprintf("%s - segment", segment.ID)
 		segmentNode := NewNode(segment.ID, name, SegmentNode)
 
 		var hasActive, hasAlarmed, hasProbablyAlarmed, hasUndefined bool
 
 		fiberIDs := strings.SplitSeq(*segment.FiberIDs, ",")
 		for fiberID := range fiberIDs {
-			fiberID, err := strconv.Atoi(fiberID)
-			if err != nil {
-				continue
-			}
-
 			node, ok := c.connectionNodes[fiberID]
 			if !ok {
 				continue
@@ -266,7 +250,7 @@ func (c *Correlation) determineComponentsStatus() {
 			continue
 		}
 
-		name := fmt.Sprintf("%d - component", component.ID)
+		name := fmt.Sprintf("%s - component", component.ID)
 		var nodeType NodeType
 		switch component.Type {
 		case "CEO":
@@ -282,11 +266,6 @@ func (c *Correlation) determineComponentsStatus() {
 
 		fiberIDs := strings.SplitSeq(*component.FiberIDs, ",")
 		for fiberID := range fiberIDs {
-			fiberID, err := strconv.Atoi(fiberID)
-			if err != nil {
-				continue
-			}
-
 			node, ok := c.connectionNodes[fiberID]
 			if !ok {
 				continue
@@ -323,7 +302,7 @@ func (c *Correlation) updateConnectionMap(connection *data.Connection) {
 		return
 	}
 
-	name := fmt.Sprintf("%d - %s", connection.ID, connection.Name)
+	name := fmt.Sprintf("%s - %s", connection.ID, connection.Name)
 	var nodeType NodeType
 	switch connection.Type {
 	case "CEO":

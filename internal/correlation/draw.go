@@ -11,7 +11,7 @@ import (
 var counter int
 
 func drawGraphs(node *Node) error {
-	g := graph.New(graph.IntHash, graph.Directed())
+	g := graph.New(graph.StringHash, graph.Directed())
 
 	walk(g, node)
 
@@ -30,7 +30,7 @@ func drawGraphs(node *Node) error {
 	return nil
 }
 
-func walk(g graph.Graph[int, int], n *Node) {
+func walk(g graph.Graph[string, string], n *Node) {
 	var attr func(*graph.VertexProperties)
 	attr = graph.VertexAttribute("color", "black")
 

@@ -138,34 +138,20 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				var opticalPower float32
 				var cause []string
 				if node.Type == correlation.SensorNode {
-					for _, sensor := range sensors {
-						if sensor.ID+1_000_000 != node.ID {
-							continue
-						}
-
-						devEUI = sensor.DevEUI
-						opticalPower = -10.0
-						cause = []string{"OPTICAL_POWER_ALERT"}
-						break
-					}
+					devEUI = node.ID
+					opticalPower = -10.0
+					cause = []string{"OPTICAL_POWER_ALERT"}
 				}
 
 				var onuSerialNumber, onuID, onuMessage string
 				if node.Type == correlation.ONUNode {
-					for _, onu := range onus {
-						if onu.ID != node.ID {
-							continue
-						}
-
-						onuSerialNumber = onu.Serial
-						onuID = strconv.Itoa(node.ID)
-						switch node.Status {
-						case correlation.Active:
-							onuMessage = "ONU activated"
-						case correlation.Alarmed:
-							onuMessage = "ONU deactivated"
-						}
-						break
+					onuSerialNumber = node.ID
+					onuID = findOnuIDByNodeID(onus, node.ID)
+					switch node.Status {
+					case correlation.Active:
+						onuMessage = "ONU activated"
+					case correlation.Alarmed:
+						onuMessage = "ONU deactivated"
 					}
 				}
 
@@ -183,7 +169,7 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 				msg := SNSMessage{
 					Timestamp:            time.Now(),
 					NetworkComponentType: networkComponentType,
-					NetworkComponentID:   strconv.Itoa(node.ID),
+					NetworkComponentID:   node.ID,
 					Description:          fmt.Sprintf("%s %s", status, networkComponentType),
 					Status:               status,
 					AlarmedProbability:   alarmedProbability,
@@ -232,4 +218,16 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			serverErrorResponse(w, r, logger, err)
 		}
 	})
+}
+
+func findOnuIDByNodeID(onus []*data.ONU, nodeID string) string {
+	for _, onu := range onus {
+		if onu.SerialNumber != nodeID {
+			continue
+		}
+
+		return onu.ID
+	}
+
+	return ""
 }

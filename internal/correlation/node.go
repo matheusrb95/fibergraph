@@ -52,7 +52,7 @@ func (s Status) String() string {
 }
 
 type Node struct {
-	ID       int
+	ID       string
 	Name     string
 	Type     NodeType
 	Status   Status
@@ -60,7 +60,7 @@ type Node struct {
 	Parents  []*Node
 }
 
-func NewNode(id int, name string, nodeType NodeType) *Node {
+func NewNode(id string, name string, nodeType NodeType) *Node {
 	return &Node{
 		ID:     id,
 		Name:   name,

@@ -8,7 +8,7 @@ import (
 )
 
 type Segment struct {
-	ID       int
+	ID       string
 	FiberIDs *string
 }
 

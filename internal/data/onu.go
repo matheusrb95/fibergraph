@@ -8,9 +8,10 @@ import (
 )
 
 type ONU struct {
-	ID     int
-	Serial string
-	Status string
+	ID           string
+	SerialNumber string
+	Status       string
+	FiberID      string
 }
 
 type ONUModel struct {
@@ -50,11 +51,14 @@ func getONUs(ctx context.Context, tx *sql.Tx, projectID string) ([]*ONU, error) 
 		SELECT
 			o.onu_network_component_id,
 			o.onu_gpon_serial_number,
-			o.onu_operational_state
+			o.onu_operational_state,
+			p2.port_network_component_id
 		FROM
 			onu o
 			LEFT OUTER JOIN network_component nc ON nc.nc_id = o.onu_network_component_id
 			LEFT OUTER JOIN project_network_component pnc ON pnc_network_component_id = nc.nc_id
+			LEFT OUTER JOIN port p1 ON p1.port_network_component_id = nc.nc_id
+			LEFT OUTER JOIN port p2 ON p2.port_connected_to_port_id = p1.port_id
 		WHERE
 			pnc.pnc_project_id = ?;
 	`
@@ -70,8 +74,9 @@ func getONUs(ctx context.Context, tx *sql.Tx, projectID string) ([]*ONU, error) 
 		var onu ONU
 		err := rows.Scan(
 			&onu.ID,
-			&onu.Serial,
+			&onu.SerialNumber,
 			&onu.Status,
+			&onu.FiberID,
 		)
 		if err != nil {
 			return nil, err

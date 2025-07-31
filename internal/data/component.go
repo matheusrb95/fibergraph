@@ -8,7 +8,7 @@ import (
 )
 
 type Component struct {
-	ID       int
+	ID       string
 	FiberIDs *string
 	Type     string
 }
