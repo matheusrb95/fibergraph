@@ -13,9 +13,9 @@ type Services struct {
 
 func NewServices(cfg aws.Config) *Services {
 	var client *sns.Client
-	if os.Getenv("LOCALSTACK") == "true" {
+	if snsEndpoint := os.Getenv("SNS_ENDPOINT"); snsEndpoint != "" {
 		client = sns.NewFromConfig(cfg, func(o *sns.Options) {
-			o.BaseEndpoint = aws.String("http://localhost:4566")
+			o.BaseEndpoint = aws.String(snsEndpoint)
 		})
 	} else {
 		client = sns.NewFromConfig(cfg)
