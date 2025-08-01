@@ -100,3 +100,11 @@ func (n *Node) ActiveSensor() bool {
 func (n *Node) AlarmedSensor() bool {
 	return n.Type == SensorNode && n.Status == Alarmed
 }
+
+func (n *Node) ActiveONU() bool {
+	return n.Type == ONUNode && n.Status == Active
+}
+
+func (n *Node) AlarmedONU() bool {
+	return n.Type == ONUNode && n.Status == Alarmed
+}

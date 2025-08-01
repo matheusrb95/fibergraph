@@ -5,6 +5,13 @@ type InconsistentCase struct {
 	ActiveSensor  *Node
 }
 
+func InconsistentCases(node *Node) []*InconsistentCase {
+	result := make([]*InconsistentCase, 0)
+	checkInconsistency(node, &result)
+
+	return result
+}
+
 func checkInconsistency(node *Node, result *[]*InconsistentCase) {
 	for _, child := range node.Children {
 		if child.AlarmedSensor() {

@@ -62,11 +62,8 @@ func (c *Correlation) Run() error {
 	}
 
 	for _, rootNode := range rootNodes {
-		inconsistentSensors := make([]*InconsistentCase, 0)
-		checkInconsistency(rootNode, &inconsistentSensors)
-
-		for _, is := range inconsistentSensors {
-			c.determineInconsistentSensor(is.AlarmedSensor, is.ActiveSensor)
+		for _, iCase := range InconsistentCases(rootNode) {
+			c.determineInconsistentSensor(iCase.AlarmedSensor, iCase.ActiveSensor)
 		}
 
 		propagateSensorStatus(rootNode)
@@ -78,8 +75,6 @@ func (c *Correlation) Run() error {
 				return err
 			}
 		}
-
-		break
 	}
 
 	c.determineComponentsStatus()
@@ -280,14 +275,10 @@ func propagateSensorStatus(node *Node) {
 	for _, child := range node.Children {
 		propagateSensorStatus(child)
 
-		if child.Type != SensorNode {
-			continue
-		}
-
-		switch child.Status {
-		case Active:
+		switch {
+		case child.ActiveSensor():
 			activeAllAbove(node)
-		case Alarmed:
+		case child.AlarmedSensor():
 			alarmAllBelow(node)
 			probablyAlarmedAllAbove(node)
 		}
@@ -302,14 +293,10 @@ func propagateONUStatus(node *Node) {
 	for _, child := range node.Children {
 		propagateONUStatus(child)
 
-		if child.Type != ONUNode {
-			continue
-		}
-
-		switch child.Status {
-		case Active:
+		switch {
+		case child.ActiveONU():
 			activeAllAbove(node)
-		case Alarmed:
+		case child.AlarmedONU():
 			alarmAllBelow(node)
 			probablyAlarmedAllAbove(node)
 		}
@@ -338,10 +325,6 @@ func alarmAllBelow(node *Node) {
 
 	for _, child := range node.Children {
 		alarmAllBelow(child)
-		if child.Type == SensorNode {
-			continue
-		}
-
 		child.Status = Alarmed
 	}
 }
