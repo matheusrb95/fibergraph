@@ -1,3 +1,4 @@
 *.gv
 *.svg
 .env
+.vscode
