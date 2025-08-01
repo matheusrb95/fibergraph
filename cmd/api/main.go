@@ -50,7 +50,15 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("sns client not working. %w", err)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	var slogLevel slog.Level
+	switch os.Getenv("LOG_LEVEL") {
+	case "DEBUG":
+		slogLevel = slog.LevelDebug
+	default:
+		slogLevel = slog.LevelInfo
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel}))
 	models := data.NewModels(db)
 	srv := api.NewServer(logger, models, services)
 

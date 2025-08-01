@@ -200,7 +200,7 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 					logger.Warn("error sending sns message", "err", err.Error())
 					continue
 				}
-				logger.Info("sns message send.", "msg", string(jsonBytes))
+				logger.Debug("sns message send.", "msg", string(jsonBytes))
 			}
 		}()
 
