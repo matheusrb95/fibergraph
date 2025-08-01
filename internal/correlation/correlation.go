@@ -258,20 +258,14 @@ func (c *Correlation) updateConnectionMap(connection *data.Connection) {
 	name := fmt.Sprintf("%s - %s", connection.ID, connection.Name)
 	var nodeType NodeType
 	switch connection.Type {
-	case "CEO":
-		nodeType = CEONode
-	case "CTO":
-		nodeType = CTONode
 	case "CO":
 		nodeType = CONode
-	case "ONU":
-		nodeType = ONUNode
+	case "DIO":
+		nodeType = DIONode
 	case "Fiber":
 		nodeType = FiberNode
 	case "Splitter":
 		nodeType = SplitterNode
-	case "Sensor":
-		nodeType = SensorNode
 	}
 	c.connectionNodes[connection.ID] = NewNode(connection.ID, name, nodeType)
 }

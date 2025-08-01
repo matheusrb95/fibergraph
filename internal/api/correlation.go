@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/matheusrb95/fibergraph/internal/aws"
@@ -123,8 +122,8 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 
 		go func() {
 			for _, node := range c.Result() {
-				networkComponentType := strings.ToUpper(node.Type.String())
-				status := strings.ToUpper(node.Status.String())
+				networkComponentType := node.Type.String()
+				status := node.Status.String()
 
 				var devEUI string
 				var opticalPower float32

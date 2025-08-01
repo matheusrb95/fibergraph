@@ -12,6 +12,7 @@ const (
 	CEONode
 	CTONode
 	CONode
+	DIONode
 	SensorNode
 	ONUNode
 )
@@ -25,22 +26,23 @@ const (
 )
 
 var nodeName = map[NodeType]string{
-	FiberNode:    "Fiber",
-	SplitterNode: "Splitter",
-	SegmentNode:  "Segment",
+	FiberNode:    "FIBER",
+	SplitterNode: "SPLITTER",
+	SegmentNode:  "SEGMENT",
 	CEONode:      "CEO",
 	CTONode:      "CTO",
 	CONode:       "CO",
-	SensorNode:   "Sensor",
+	DIONode:      "DIO",
+	SensorNode:   "SENSOR",
 	ONUNode:      "ONU",
 }
 
 var statusName = map[Status]string{
-	Active:          "Active",
-	Alarmed:         "Alarmed",
-	ProbablyAlarmed: "Probably_Alarmed",
-	Undefined:       "Undefined",
-	Inconsistent:    "Inconsistent",
+	Active:          "ACTIVE",
+	Alarmed:         "ALARMED",
+	ProbablyAlarmed: "PROBABLY_ALARMED",
+	Undefined:       "UNDEFINED",
+	Inconsistent:    "INCONSISTENT",
 }
 
 func (nt NodeType) String() string {

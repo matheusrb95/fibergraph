@@ -68,7 +68,10 @@ SELECT
 	p1.port_network_component_id AS port_network_component_id,
     'no_name',
 	p2.port_network_component_id AS parent,
-    null,
+    CASE
+		WHEN (f1.fiber_id OR f2.fiber_id) IS NOT NULL THEN 'Fiber'
+		WHEN (s1.splitter_network_component_id OR s2.splitter_network_component_id) IS NOT NULL THEN 'Splitter'
+	END,
     'Fiber'
 FROM
 	cto_connection cc 
@@ -81,6 +84,11 @@ FROM
     LEFT OUTER JOIN cto ON cto.cto_network_component_id = cc.ctc_cto_id
     LEFT OUTER JOIN network_component nc ON nc.nc_id = cto.cto_network_component_id
     LEFT OUTER JOIN project_network_component pnc ON pnc.pnc_network_component_id = nc.nc_id
+
+	LEFT OUTER JOIN fiber f1 ON f1.fiber_id = p1.port_network_component_id
+	LEFT OUTER JOIN fiber f2 ON f2.fiber_id = p2.port_network_component_id
+	LEFT OUTER JOIN splitter s1 ON s1.splitter_network_component_id = p1.port_network_component_id
+	LEFT OUTER JOIN splitter s2 ON s2.splitter_network_component_id = p2.port_network_component_id
 WHERE
 	pnc.pnc_project_id = ?
 
