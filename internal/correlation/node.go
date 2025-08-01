@@ -92,3 +92,11 @@ func (n *Node) addParents(nodes ...*Node) {
 func (n *Node) addChildren(nodes ...*Node) {
 	n.Children = append(n.Children, nodes...)
 }
+
+func (n *Node) ActiveSensor() bool {
+	return n.Type == SensorNode && n.Status == Active
+}
+
+func (n *Node) AlarmedSensor() bool {
+	return n.Type == SensorNode && n.Status == Alarmed
+}
