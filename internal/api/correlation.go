@@ -21,6 +21,11 @@ type EquipmentStatus struct {
 	AlarmedONUs     []string `json:"alarmed_onus"`
 }
 
+type ComponentStatus struct {
+	ComponentName   string `json:"name"`
+	ComponentStatus string `json:"status"`
+}
+
 func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.Services) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tenantID := r.PathValue("tenant_id")
@@ -130,7 +135,13 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 			}
 		}()
 
-		err = response.JSON(w, http.StatusOK, response.Envelope{"correlation": "done"})
+		result := make([]ComponentStatus, 0)
+		for _, node := range c.Result() {
+			cs := ComponentStatus{ComponentName: node.Name, ComponentStatus: node.Status.String()}
+			result = append(result, cs)
+		}
+
+		err = response.JSON(w, http.StatusOK, response.Envelope{"network": result})
 		if err != nil {
 			serverErrorResponse(w, r, logger, err)
 		}
