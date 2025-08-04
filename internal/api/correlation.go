@@ -2,11 +2,9 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/matheusrb95/fibergraph/internal/aws"
 	"github.com/matheusrb95/fibergraph/internal/correlation"
@@ -21,27 +19,6 @@ type EquipmentStatus struct {
 	InactiveSensors []string `json:"inactive_sensors"`
 	ActiveONUs      []string `json:"active_onus"`
 	AlarmedONUs     []string `json:"alarmed_onus"`
-}
-
-type SNSMessage struct {
-	Timestamp            time.Time `json:"timestamp"`
-	NetworkComponentType string    `json:"network_component_type"`
-	NetworkComponentID   string    `json:"network_component_id"`
-	Description          string    `json:"description"`
-	Status               string    `json:"status"`
-	AlarmedProbability   string    `json:"alarmedProbability"`
-	AlarmedBox           int       `json:"alarmed_box"`
-	Last                 bool      `json:"last"`
-	RootID               int       `json:"rootID"`
-	ProjectID            int       `json:"projectID"`
-	TenantID             string    `json:"tenant_id"`
-	DevEUI               string    `json:"dev_eui,omitempty"`
-	Cause                []string  `json:"cause,omitempty"`
-	OpticalPower         float32   `json:"opticalPower,omitempty"`
-	SerialNumber         string    `json:"serial_number"`
-	ONUSerialNumber      string    `json:"onu_sn,omitempty"`
-	ONUID                string    `json:"onu_id,omitempty"`
-	ONUMessage           string    `json:"message,omitempty"`
 }
 
 func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.Services) http.Handler {
@@ -122,77 +99,26 @@ func HandleCorrelation(logger *slog.Logger, models *data.Models, services *aws.S
 
 		go func() {
 			for _, node := range c.Result() {
-				networkComponentType := node.Type.String()
-				status := node.Status.String()
-
-				var devEUI string
-				var opticalPower float32
-				var cause []string
-				if node.Type == correlation.SensorNode {
-					devEUI = node.ID
-					opticalPower = -10.0
-					cause = []string{"OPTICAL_POWER_ALERT"}
-				}
-
-				var onuSerialNumber, onuID, onuMessage string
-				if node.Type == correlation.ONUNode {
-					onuSerialNumber = node.ID
-					onuID = findOnuIDByNodeID(onus, node.ID)
-					switch node.Status {
-					case correlation.Active:
-						onuMessage = "ONU activated"
-					case correlation.Alarmed:
-						onuMessage = "ONU deactivated"
-					}
-				}
-
-				var alarmedProbability string
-				var alarmedBox int
-				switch node.Status {
-				case correlation.Alarmed:
-					alarmedProbability = "1.0"
-					alarmedBox = 1
+				var topic string
+				var msg *data.SNSMessage
+				switch node.Type {
+				case correlation.ONUNode:
+					topic = "EH_ONU_EVENTS"
+					msg = data.NewONUMessage(node.Type.String(), node.ID, node.Status.String(), tenantID, projectIDint, findOnuIDByNodeID(onus, node.ID))
+				case correlation.SensorNode:
+					topic = "EH_IOT_EVENTS"
+					msg = data.NewSensorMessage(node.Type.String(), node.ID, node.Status.String(), tenantID, projectIDint)
+				case correlation.FiberNode:
+					continue
 				default:
-					alarmedProbability = "0.0"
-					alarmedBox = 0
-				}
-
-				msg := SNSMessage{
-					Timestamp:            time.Now(),
-					NetworkComponentType: networkComponentType,
-					NetworkComponentID:   node.ID,
-					Description:          fmt.Sprintf("%s %s", status, networkComponentType),
-					Status:               status,
-					AlarmedProbability:   alarmedProbability,
-					AlarmedBox:           alarmedBox,
-					Last:                 false,
-					RootID:               0,
-					ProjectID:            projectIDint,
-					TenantID:             tenantID,
-					DevEUI:               devEUI,
-					Cause:                cause,
-					OpticalPower:         opticalPower,
-					ONUSerialNumber:      onuSerialNumber,
-					ONUID:                onuID,
-					ONUMessage:           onuMessage,
+					topic = "EH_TOPOLOGIC_EVENTS"
+					msg = data.NewSensorMessage(node.Type.String(), node.ID, node.Status.String(), tenantID, projectIDint)
 				}
 
 				jsonBytes, err := json.Marshal(msg)
 				if err != nil {
 					logger.Warn("error marshaling sns message", "err", err.Error())
 					continue
-				}
-
-				var topic string
-				switch node.Type {
-				case correlation.ONUNode:
-					topic = "EH_ONU_EVENTS"
-				case correlation.SensorNode:
-					topic = "EH_IOT_EVENTS"
-				case correlation.FiberNode:
-					continue
-				default:
-					topic = "EH_TOPOLOGIC_EVENTS"
 				}
 
 				err = services.SNS.Publish(string(jsonBytes), topic)
