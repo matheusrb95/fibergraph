@@ -16,7 +16,6 @@ import (
 	"github.com/matheusrb95/fibergraph/internal/data"
 	"github.com/matheusrb95/fibergraph/internal/database"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 )
 
@@ -39,7 +38,7 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("load aws config. %w", err)
 	}
 
-	db, err := database.OpenDB()
+	db, err := database.Open()
 	if err != nil {
 		return fmt.Errorf("open db. %w", err)
 	}

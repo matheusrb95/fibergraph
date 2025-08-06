@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"os"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
-func OpenDB() (*sql.DB, error) {
+func Open() (*sql.DB, error) {
 	db, err := sql.Open("mysql", os.Getenv("DB_DSN"))
 	if err != nil {
 		return nil, err
