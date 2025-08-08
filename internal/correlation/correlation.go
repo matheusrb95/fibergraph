@@ -135,8 +135,6 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 			status = Active
 		} else if slices.Contains(c.InactiveSensors, sensor.DevEUI) {
 			status = Undefined
-		} else {
-			status = Undefined
 		}
 
 		node.Status = status
@@ -155,12 +153,19 @@ func (c *Correlation) buildNetworkWithConnection() []*Node {
 		node := NewNode(onu.SerialNumber, name, ONUNode)
 
 		var status Status
+		switch onu.Status {
+		case "ACTIVE":
+			status = Active
+		case "ALARMED":
+			status = Alarmed
+		default:
+			status = Undefined
+		}
+
 		if slices.Contains(c.AlarmedONUs, onu.SerialNumber) {
 			status = Alarmed
 		} else if slices.Contains(c.ActiveONUs, onu.SerialNumber) {
 			status = Active
-		} else {
-			status = Undefined
 		}
 
 		node.Status = status
